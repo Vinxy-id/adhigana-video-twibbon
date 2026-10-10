@@ -1,0 +1,14 @@
+{
+  "campaign_title": "ADHIGANA INFORMATIKA 2026",
+  "campaign_subtitle": "Fakultas Sains dan Teknologi",
+  "campaign_tagline": "Are You Ready? Better Things Ahead :)",
+  "description": "Upload foto terbaikmu dan dapatkan Video Twibbon resmi Adhigana Informatika 2026 secara otomatis tanpa perlu aplikasi editing ataupun setting chroma key!",
+  "caption_template": "[ARE YOU READY FOR ADHIGANA INFORMATIKA 2026?]\n\nHalo semuanya! Saya [Isi Nama Kamu] dari Program Studi Informatika, Fakultas Sains dan Teknologi, siap melangkah maju dan berkontribusi bersama di #AdhiganaInformatika2026! \n\n\"Better Things Ahead :)\"\n\n#Adhigana2026 #Informatika #FakultasSainsDanTeknologi #MabaInformatika #VideoTwibbon",
+  "template_video": "videos/template.mp4",
+  "static_frame": "images/frame.png",
+  "circle_center_x": 536,
+  "circle_center_y": 543,
+  "circle_radius": 330,
+  "twibbonize_url": "https://www.twibbonize.com",
+  "admin_pin": "adhigana2026"
+}

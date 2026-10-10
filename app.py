@@ -18,6 +18,7 @@ BASE_DIR = Path(__file__).resolve().parent
 CONFIG_PATH = BASE_DIR / "config.json"
 TEMP_DIR = BASE_DIR / "temp"
 TEMP_DIR.mkdir(exist_ok=True)
+DIST_DIR = BASE_DIR / "dist"
 
 # Concurrency & Rate Limiting
 RENDER_SEMAPHORE = threading.Semaphore(2)  # Max 2 concurrent FFmpeg rendering jobs
@@ -126,6 +127,8 @@ cleanup_thread.start()
 
 @app.route("/")
 def index():
+    if (DIST_DIR / "index.html").exists():
+        return send_from_directory(DIST_DIR, "index.html")
     cfg = get_safe_config()
     local_ip = get_local_ip()
     port = int(os.environ.get("PORT", 5000))
@@ -145,13 +148,29 @@ def index():
         is_admin=is_admin
     )
 
+@app.route("/assets/<path:filename>")
+def serve_assets(filename):
+    if (DIST_DIR / "assets").exists():
+        return send_from_directory(DIST_DIR / "assets", filename)
+    return "", 404
+
 @app.route("/favicon.ico")
 def favicon_ico():
+    if (DIST_DIR / "favicon.ico").exists():
+        return send_from_directory(DIST_DIR, "favicon.ico", mimetype="image/vnd.microsoft.icon")
     return send_from_directory(BASE_DIR / "static", "favicon.ico", mimetype="image/vnd.microsoft.icon")
 
 @app.route("/favicon.svg")
 def favicon_svg():
+    if (DIST_DIR / "favicon.svg").exists():
+        return send_from_directory(DIST_DIR, "favicon.svg", mimetype="image/svg+xml")
     return send_from_directory(BASE_DIR / "static", "favicon.svg", mimetype="image/svg+xml")
+
+@app.route("/favicon.png")
+def favicon_png():
+    if (DIST_DIR / "favicon.png").exists():
+        return send_from_directory(DIST_DIR, "favicon.png", mimetype="image/png")
+    return send_from_directory(BASE_DIR / "static", "favicon.png", mimetype="image/png")
 
 @app.route("/api/config", methods=["GET", "POST"])
 def handle_config():
@@ -207,8 +226,11 @@ def network_info():
         "localhost_url": f"http://localhost:{port}"
     })
 
-@app.route("/api/render-video", methods=["POST"])
+@app.route("/api/render-video", methods=["POST", "HEAD"])
 def render_video():
+    if request.method == "HEAD":
+        return "", 200
+
     client_ip = get_client_ip()
 
     # Rate limiting check

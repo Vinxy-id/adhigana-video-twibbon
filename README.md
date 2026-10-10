@@ -36,7 +36,18 @@ Aplikasi web pembuat Video Twibbon interaktif mirip cara kerja **Twibbonize**. M
 
 ## 🚀 Cara Menjalankan
 
-### Cara 1: Menggunakan File Batch (Paling Mudah)
+### Cara 1: Menjalankan Versi Modern React + Vite (Paling Direkomendasikan)
+Cukup **klik 2x** file:
+```
+start_dev.bat
+```
+Atau jalankan di terminal:
+```bash
+npm run dev
+```
+Aplikasi akan otomatis menyala di `http://localhost:5173` dengan hot-reload kilat.
+
+### Cara 2: Menggunakan File Batch Python (Flask)
 Cukup **klik 2x** file:
 ```
 start_twibbon.bat
@@ -92,23 +103,20 @@ Tautan publik `https://...` akan otomatis terbuat dan bisa Anda sebarkan ke grup
 
 ## ☁️ Panduan Deploy ke Cloud (Online 24/7)
 
-Karena backend menggunakan **FFmpeg** untuk penggabungan video 1080p, disarankan menggunakan platform yang mendukung Docker:
+### Opsi 1: Vercel / Cloudflare Pages (100% Client-Side, 0 Biaya, Anti-Down) ⭐ REKOMENDASI UTAMA UNTUK OSPEK
+Karena aplikasi React ini mendukung pemrosesan 100% di browser (Canvas & MediaRecorder):
+1. Push repositori ini ke GitHub.
+2. Buka [vercel.com](https://vercel.com) atau [pages.cloudflare.com](https://pages.cloudflare.com).
+3. Import repository GitHub ini.
+4. Framework Preset akan otomatis terdeteksi sebagai **Vite**.
+5. Klik **Deploy**! Web langsung aktif dengan link gratis HTTPS (contoh: `twibbon-ospek.vercel.app`) dan kuat menampung ribuan maba serentak tanpa takut server down!
 
-### Opsi 1: Render.com (Mudah & Gratis)
-1. Buat akun di [render.com](https://render.com) dan hubungkan akun GitHub Anda.
-2. Klik **New +** > **Web Service**.
-3. Pilih repository ini (`adhigana-video-twibbon`).
-4. Pada pilihan **Environment**, pilih **Docker** (Render otomatis mendeteksi `Dockerfile` dan menginstall FFmpeg).
-5. Pada bagian **Instance Type**, pilih **Free**.
-6. Klik **Create Web Service**. Tunggu proses build selesai dan URL publik Anda siap digunakan!
-
-### Opsi 2: Railway.app
-1. Buka [railway.app](https://railway.app) dan login dengan GitHub.
-2. Klik **New Project** > **Deploy from GitHub repo**.
-3. Pilih repository ini. Railway otomatis mendeteksi `Dockerfile` dan langsung menjalankan server.
-
-### Opsi 3: Hugging Face Spaces (Gratis & Kuat)
+### Opsi 2: Hugging Face Spaces (Gratis dengan Dukungan FFmpeg Server)
 1. Buka [huggingface.co/spaces](https://huggingface.co/spaces).
 2. Buat Space baru, pilih SDK: **Docker**.
-3. Hubungkan atau push repositori ini ke Space Anda. Mendapatkan spesifikasi 2 vCPU + 16 GB RAM gratis.
+3. Push repositori ini ke Space Anda. Mendapatkan spesifikasi 2 vCPU + 16 GB RAM gratis untuk menjalankan `Dockerfile` + FFmpeg.
+
+### Opsi 3: Render.com / Railway
+1. Buat akun di [render.com](https://render.com) atau [railway.app](https://railway.app).
+2. Pilih Docker environment untuk menjalankan backend Flask.
 
