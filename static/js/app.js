@@ -780,7 +780,151 @@ document.addEventListener("DOMContentLoaded", () => {
     renderComposite();
   });
 
-  // DOWNLOAD VIDEO (MP4) VIA BACKEND FFMPEG
+  // IN-BROWSER CLIENT-SIDE VIDEO RECORDING (Zero Server / Vercel / GitHub Pages / Offline)
+  async function recordVideoClientSide() {
+    renderProgressBar.style.width = "5%";
+    renderStatusText.textContent = "Menyiapkan perekaman video di browser...";
+
+    // 1. Capture stream from compositeCanvas at 30 fps
+    const canvasStream = compositeCanvas.captureStream(30);
+    const combinedStream = new MediaStream();
+    canvasStream.getVideoTracks().forEach(track => combinedStream.addTrack(track));
+
+    // 2. Attach audio from templateVideo via Web Audio API
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (AudioContextClass) {
+        const audioCtx = new AudioContextClass();
+        if (audioCtx.state === "suspended") {
+          await audioCtx.resume();
+        }
+        if (!templateVideo._audioSource) {
+          templateVideo._audioSource = audioCtx.createMediaElementSource(templateVideo);
+        }
+        const audioDest = audioCtx.createMediaStreamDestination();
+        templateVideo._audioSource.connect(audioDest);
+        const audioTrack = audioDest.stream.getAudioTracks()[0];
+        if (audioTrack) {
+          combinedStream.addTrack(audioTrack);
+        }
+      }
+    } catch (err) {
+      console.warn("AudioContext setup:", err);
+    }
+
+    // 3. Select supported MIME type
+    const mimeTypes = [
+      'video/mp4;codecs=avc1,mp4a.40.2',
+      'video/mp4;codecs=avc1',
+      'video/mp4',
+      'video/webm;codecs=h264,opus',
+      'video/webm;codecs=vp9,opus',
+      'video/webm'
+    ];
+    let selectedMime = mimeTypes.find(type => MediaRecorder.isTypeSupported(type)) || '';
+
+    let recorder;
+    try {
+      recorder = selectedMime
+        ? new MediaRecorder(combinedStream, { mimeType: selectedMime, videoBitsPerSecond: 6000000 })
+        : new MediaRecorder(combinedStream);
+    } catch (e) {
+      recorder = new MediaRecorder(combinedStream);
+    }
+
+    const recordedChunks = [];
+    recorder.ondataavailable = (e) => {
+      if (e.data && e.data.size > 0) {
+        recordedChunks.push(e.data);
+      }
+    };
+
+    templateVideo.currentTime = 0;
+    templateVideo.muted = false; // Need sound on for audio destination
+    await new Promise(res => {
+      const onSeeked = () => {
+        templateVideo.removeEventListener("seeked", onSeeked);
+        res();
+      };
+      templateVideo.addEventListener("seeked", onSeeked);
+      setTimeout(res, 400);
+    });
+
+    recorder.start(100);
+
+    const duration = templateVideo.duration || 17.9;
+    let recordingActive = true;
+
+    return new Promise((resolve, reject) => {
+      function renderRecordingFrame() {
+        if (!recordingActive) return;
+        renderComposite();
+
+        const cur = templateVideo.currentTime;
+        const pct = Math.min(95, Math.floor(10 + (cur / duration) * 85));
+        renderProgressBar.style.width = `${pct}%`;
+        renderStatusText.textContent = `Merekam video di browsermu (${Math.floor(cur)}s / ${Math.floor(duration)}s)...`;
+
+        if (cur >= duration - 0.2 || templateVideo.ended) {
+          finishRecording();
+        } else {
+          requestAnimationFrame(renderRecordingFrame);
+        }
+      }
+
+      function finishRecording() {
+        if (!recordingActive) return;
+        recordingActive = false;
+        templateVideo.pause();
+        templateVideo.muted = true;
+
+        renderProgressBar.style.width = "98%";
+        renderStatusText.textContent = "Menyimpan video...";
+
+        recorder.onstop = () => {
+          try {
+            const finalMime = recorder.mimeType || selectedMime || 'video/mp4';
+            const isMp4 = finalMime.toLowerCase().includes('mp4');
+            const ext = isMp4 ? 'mp4' : 'webm';
+            const videoBlob = new Blob(recordedChunks, { type: finalMime });
+
+            const downloadUrl = URL.createObjectURL(videoBlob);
+            const a = document.createElement("a");
+            a.href = downloadUrl;
+            a.download = `Video_Twibbon_${(config.campaign_title || "Adhigana").replace(/\s+/g, "_")}.${ext}`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(downloadUrl);
+
+            renderProgressBar.style.width = "100%";
+            renderStatusText.textContent = "Selesai! Mengunduh video...";
+
+            setTimeout(() => {
+              renderModal.classList.add("hidden");
+              triggerCelebration();
+              showToast("Video Twibbon berhasil didownload!");
+              resolve();
+            }, 800);
+          } catch (err) {
+            reject(err);
+          }
+        };
+
+        recorder.stop();
+      }
+
+      templateVideo.play().then(() => {
+        requestAnimationFrame(renderRecordingFrame);
+      }).catch(err => {
+        recordingActive = false;
+        recorder.stop();
+        reject(err);
+      });
+    });
+  }
+
+  // DOWNLOAD VIDEO (MP4) - HYBRID AUTO-SWITCH: SERVER FFMPEG OR CLIENT-SIDE RECORDER
   btnDownloadVideo.addEventListener("click", async () => {
     if (!userImg) {
       showToast("Harap pilih foto terlebih dahulu sebelum mendownload video!", "error");
@@ -796,10 +940,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     renderModal.classList.remove("hidden");
+
+    // Detect if running on static host (Vercel, GitHub Pages, HF Spaces Static, or local file://)
+    const isStaticHost = window.location.hostname.includes("github.io") || 
+                         window.location.hostname.includes("vercel.app") || 
+                         window.location.hostname.includes("hf.space") || 
+                         window.location.protocol === "file:";
+
+    if (isStaticHost) {
+      try {
+        await recordVideoClientSide();
+      } catch (err) {
+        renderModal.classList.add("hidden");
+        console.error(err);
+        showToast(`Gagal: ${err.message}`, "error");
+      }
+      return;
+    }
+
+    // Otherwise, try server FFmpeg first (e.g. running Python app.py)
     renderProgressBar.style.width = "15%";
     renderStatusText.textContent = "Menyiapkan foto resolusi tinggi...";
 
-    // Extract high-res 1080x1080 composited user photo
     updatePhotoCanvas();
     const photoBlob = await new Promise((resolve) => photoCanvas.toBlob(resolve, "image/png"));
 
@@ -807,9 +969,8 @@ document.addEventListener("DOMContentLoaded", () => {
     formData.append("photo", photoBlob, "user_photo.png");
 
     renderProgressBar.style.width = "40%";
-    renderStatusText.textContent = "Menggabungkan video dengan FFmpeg 1080p...";
+    renderStatusText.textContent = "Menggabungkan video dengan server FFmpeg 1080p...";
 
-    // Fake smooth progress while FFmpeg runs (usually 4-5s)
     let p = 40;
     const progressInterval = setInterval(() => {
       if (p < 88) {
@@ -826,8 +987,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
       clearInterval(progressInterval);
 
+      if (response.status === 404) {
+        // If server endpoint does not exist, seamlessly fallback to client-side recording!
+        console.log("Endpoint /api/render-video tidak ada, beralih ke in-browser recorder...");
+        await recordVideoClientSide();
+        return;
+      }
+
       if (!response.ok) {
-        const errJson = await response.json();
+        const errJson = await response.json().catch(() => ({}));
         throw new Error(errJson.message || "Gagal me-render video di server");
       }
 
@@ -852,9 +1020,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
     } catch (err) {
       clearInterval(progressInterval);
-      renderModal.classList.add("hidden");
-      console.error(err);
-      showToast(`Gagal: ${err.message}`, "error");
+      console.warn("Backend render error, mencoba fallback in-browser recorder:", err);
+      // Fallback to client-side recorder on error
+      try {
+        await recordVideoClientSide();
+      } catch (clientErr) {
+        renderModal.classList.add("hidden");
+        console.error(clientErr);
+        showToast(`Gagal: ${err.message}`, "error");
+      }
     }
   });
 
