@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>{{ config.campaign_title }} - Video Twibbon Creator</title>
+  
+  <!-- Google Fonts & Tailwind CDN -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome Icons & Canvas Confetti -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <!-- Favicon (SVG & PNG Fallback) -->
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}?v=1">
+  <link rel="alternate icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}?v=1">
+  <link rel="apple-touch-icon" href="{{ url_for('static', filename='favicon.png') }}?v=1">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=5">
+</head>
+<body class="bg-[#0b0c10] text-[#e0e2ec] font-['Plus_Jakarta_Sans'] min-h-screen flex flex-col selection:bg-red-600 selection:text-white">
+
+  <!-- TOP NAVBAR -->
+  <header class="border-b border-[#232733] bg-[#12141c]/90 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-400 flex items-center justify-center shadow-lg shadow-red-500/20 text-white font-bold text-lg font-['Space_Grotesk']">
+          <i class="fa-solid fa-play"></i>
+        </div>
+        <div>
+          <h1 class="text-base font-bold text-white tracking-wide flex items-center gap-2">
+            {{ config.campaign_title }}
+            <span class="text-[10px] bg-red-950 text-red-400 border border-red-800/60 font-semibold px-2 py-0.5 rounded-full">RESMI</span>
+          </h1>
+          <p class="text-xs text-gray-400 font-medium">{{ config.campaign_subtitle }}</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btnShareModal" class="px-3 py-1.5 rounded-lg bg-[#1f2330] hover:bg-[#2b3042] text-xs font-semibold text-gray-200 border border-gray-700/60 flex items-center gap-1.5 transition">
+          <i class="fa-solid fa-qrcode text-red-400"></i>
+          <span class="hidden sm:inline">Buka di HP</span>
+        </button>
+        {% if is_admin %}
+        <button id="btnSettingsModal" class="px-3 py-1.5 rounded-lg bg-red-950/80 hover:bg-red-900 text-xs font-semibold text-red-300 border border-red-700/60 flex items-center gap-1.5 transition" title="Mode Pengaturan Admin">
+          <i class="fa-solid fa-gear text-red-400"></i>
+          <span>Pengaturan Admin</span>
+        </button>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <!-- MAIN CONTAINER -->
+  <main class="max-w-6xl mx-auto px-4 py-6 flex-1 w-full flex flex-col items-center">
+    
+    <!-- BANNER INFO -->
+    <div class="w-full text-center mb-6">
+      <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-900/20 border border-red-700/30 text-xs font-semibold text-red-400 mb-2">
+        <i class="fa-solid fa-circle-check text-[10px]"></i> Auto Chroma Key • Video Twibbon 1080p
+      </div>
+      <h2 class="text-2xl sm:text-3xl font-extrabold text-white font-['Space_Grotesk'] tracking-tight">
+        Pasang Video Twibbon Kamu
+      </h2>
+      <p class="text-sm text-gray-400 mt-1 max-w-xl mx-auto">
+        Tinggal upload foto, atur posisi pas di lingkaran, dan download video siap upload ke Instagram Reels, TikTok, & WhatsApp!
+      </p>
+    </div>
+
+    <!-- WORKSPACE GRID -->
+    <div class="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+      
+      <!-- LEFT COLUMN: INTERACTIVE PREVIEW & PLAYER -->
+      <div class="lg:col-span-7 flex flex-col items-center">
+        <div class="w-full max-w-[480px] bg-[#161822] rounded-2xl p-4 border border-[#272b3b] shadow-2xl relative">
+          
+          <!-- CANVAS / VIDEO CONTAINER (1:1 Aspect Ratio) -->
+          <div id="previewContainer" class="w-full aspect-square rounded-xl overflow-hidden bg-black relative shadow-inner cursor-grab select-none">
+            
+            <!-- Hidden Video Element for Source Frames -->
+            <video id="templateVideo" src="{{ url_for('static', filename='videos/template.mp4') }}" preload="auto" playsinline muted loop class="hidden"></video>
+            
+            <!-- Composited WebGL / 2D Canvas -->
+            <canvas id="compositeCanvas" width="1080" height="1080" class="w-full h-full object-contain block"></canvas>
+
+            <!-- Guide Helper Overlay (When Empty or Dragging) -->
+            <div id="emptyPlaceholder" class="absolute inset-0 flex flex-col items-center justify-center bg-black/65 backdrop-blur-[2px] transition pointer-events-none">
+              <div class="w-20 h-20 rounded-full border-2 border-dashed border-red-500/80 flex items-center justify-center text-red-400 mb-3 bg-red-950/30">
+                <i class="fa-solid fa-camera text-2xl"></i>
+              </div>
+              <p class="text-sm font-semibold text-white">Belum Ada Foto Terpilih</p>
+              <p class="text-xs text-gray-400 mt-0.5">Klik tombol di bawah untuk memilih foto</p>
+            </div>
+
+            <!-- Touch / Drag Hint Badge -->
+            <div id="dragHintBadge" class="hidden absolute top-3 left-3 bg-black/70 backdrop-blur-md px-2.5 py-1 rounded-md text-[11px] text-gray-300 border border-white/10 pointer-events-none">
+              <i class="fa-solid fa-hand-pointer text-red-400 mr-1"></i> Geser / cubit untuk menyesuaikan
+            </div>
+
+            <!-- Loading Spinner in Canvas -->
+            <div id="canvasLoader" class="hidden absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-3">
+              <div class="w-10 h-10 border-4 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+              <p class="text-xs font-semibold text-gray-300" id="canvasLoaderText">Memproses foto...</p>
+            </div>
+          </div>
+
+          <!-- VIDEO SCRUB & PLAYBACK BAR -->
+          <div class="mt-3.5 bg-[#1a1d29] rounded-xl p-3 border border-[#252a3b]">
+            <div class="flex items-center gap-3">
+              <button id="btnPlayPause" class="w-9 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white flex items-center justify-center transition shadow-md shadow-red-600/30">
+                <i class="fa-solid fa-play text-sm ml-0.5" id="playIcon"></i>
+              </button>
+
+              <div class="flex-1 flex flex-col gap-1">
+                <div class="flex items-center justify-between text-[11px] text-gray-400 font-mono">
+                  <span id="currentTime">00:10</span>
+                  <span id="durationTime">00:18</span>
+                </div>
+                <input id="timelineSlider" type="range" min="0" max="17.9" step="0.05" value="12" class="w-full accent-red-500 h-1.5 bg-gray-700 rounded-lg cursor-pointer">
+              </div>
+
+              <button id="btnMuteToggle" class="w-8 h-8 rounded-lg bg-[#242938] hover:bg-[#30374b] text-gray-300 text-xs flex items-center justify-center transition" title="Mute/Unmute Preview">
+                <i class="fa-solid fa-volume-xmark" id="muteIcon"></i>
+              </button>
+            </div>
+
+            <!-- TIMELINE QUICK-JUMP CHIPS -->
+            <div class="flex items-center gap-1.5 mt-2.5 pt-2 border-t border-gray-800 text-[11px]">
+              <span class="text-gray-500 text-[10px] font-semibold uppercase">Loncat Ke:</span>
+              <button class="jump-chip px-2.5 py-1 rounded bg-red-950/60 border border-red-800/40 text-red-300 hover:bg-red-900 transition inline-flex items-center gap-1.5" data-time="11.0">
+                <i class="fa-solid fa-bullseye text-red-400 text-[10px]"></i>
+                <span>Frame Twibbon (11s)</span>
+              </button>
+              <button class="jump-chip px-2.5 py-1 rounded bg-[#242938] text-gray-400 hover:text-white transition inline-flex items-center gap-1.5" data-time="0.0">
+                <i class="fa-solid fa-film text-gray-400 text-[10px]"></i>
+                <span>Awal Video (0s)</span>
+              </button>
+              <button class="jump-chip px-2.5 py-1 rounded bg-[#242938] text-gray-400 hover:text-white transition inline-flex items-center gap-1.5" data-time="7.0">
+                <i class="fa-solid fa-bolt text-amber-400 text-[10px]"></i>
+                <span>Judul (7s)</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- RIGHT COLUMN: CONTROLS & ACTIONS -->
+      <div class="lg:col-span-5 w-full flex flex-col gap-4">
+
+        <!-- STEP 1: UPLOAD PHOTO -->
+        <div class="bg-[#161822] rounded-2xl p-5 border border-[#272b3b]">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span class="w-5 h-5 rounded-full bg-red-600 text-white text-[11px] font-extrabold flex items-center justify-center">1</span>
+              Pilih Foto Anda
+            </h3>
+            <span class="text-[11px] text-gray-400">JPG, PNG, WebP</span>
+          </div>
+
+          <input type="file" id="fileInput" accept="image/*" class="hidden">
+          <input type="file" id="cameraInput" accept="image/*" capture="user" class="hidden">
+          
+          <div class="grid grid-cols-2 gap-2">
+            <button id="btnBrowseFile" class="py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-semibold text-xs flex items-center justify-center gap-2 transition shadow-lg shadow-red-600/20">
+              <i class="fa-solid fa-image"></i>
+              <span>Pilih Dari Galeri</span>
+            </button>
+            
+            <button id="btnCameraFile" class="py-2.5 px-3 rounded-xl bg-[#222736] hover:bg-[#2e3448] text-gray-200 font-semibold text-xs flex items-center justify-center gap-2 border border-gray-700/60 transition">
+              <i class="fa-solid fa-camera text-red-400"></i>
+              <span>Ambil Selfie</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 2: POSITION & TRANSFORM CONTROLS -->
+        <div class="bg-[#161822] rounded-2xl p-5 border border-[#272b3b] space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white flex items-center gap-2">
+              <span class="w-5 h-5 rounded-full bg-red-600 text-white text-[11px] font-extrabold flex items-center justify-center">2</span>
+              Atur Posisi & Ukuran Foto
+            </h3>
+            <button id="btnResetTransform" class="text-[11px] text-gray-400 hover:text-red-400 transition flex items-center gap-1">
+              <i class="fa-solid fa-rotate-left"></i> Reset
+            </button>
+          </div>
+
+          <!-- SLIDERS -->
+          <div class="space-y-3">
+            <div>
+              <div class="flex justify-between text-xs text-gray-400 mb-1">
+                <span><i class="fa-solid fa-magnifying-glass text-[10px] mr-1"></i> Zoom (Ukuran)</span>
+                <span id="zoomValueText" class="font-mono text-gray-300">100%</span>
+              </div>
+              <input id="sliderZoom" type="range" min="0.2" max="3.0" step="0.01" value="1.0" class="w-full accent-red-500 h-1.5 bg-gray-700 rounded-lg cursor-pointer">
+            </div>
+
+            <div>
+              <div class="flex justify-between text-xs text-gray-400 mb-1">
+                <span><i class="fa-solid fa-rotate text-[10px] mr-1"></i> Rotasi</span>
+                <span id="rotateValueText" class="font-mono text-gray-300">0°</span>
+              </div>
+              <input id="sliderRotate" type="range" min="-180" max="180" step="1" value="0" class="w-full accent-red-500 h-1.5 bg-gray-700 rounded-lg cursor-pointer">
+            </div>
+          </div>
+
+          <!-- QUICK ACTIONS BUTTONS -->
+          <div class="grid grid-cols-3 gap-2 pt-1">
+            <button id="btnCenterPhoto" class="py-1.5 px-2 rounded-lg bg-[#222736] hover:bg-[#2d344a] text-xs text-gray-300 font-medium transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-crosshairs text-[11px]"></i> Pusatkan
+            </button>
+            <button id="btnRotate90" class="py-1.5 px-2 rounded-lg bg-[#222736] hover:bg-[#2d344a] text-xs text-gray-300 font-medium transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-rotate-right text-[11px]"></i> +90°
+            </button>
+            <button id="btnFitCircle" class="py-1.5 px-2 rounded-lg bg-[#222736] hover:bg-[#2d344a] text-xs text-gray-300 font-medium transition flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-expand text-[11px]"></i> Pas Bingkai
+            </button>
+          </div>
+        </div>
+
+        <!-- STEP 3: DOWNLOAD & EXPORT -->
+        <div class="bg-[#161822] rounded-2xl p-5 border border-[#272b3b] space-y-3">
+          <h3 class="text-sm font-bold text-white flex items-center gap-2">
+            <span class="w-5 h-5 rounded-full bg-red-600 text-white text-[11px] font-extrabold flex items-center justify-center">3</span>
+            Download & Bagikan
+          </h3>
+
+          <!-- PRIMARY: DOWNLOAD VIDEO (MP4) -->
+          <button id="btnDownloadVideo" class="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-red-600 via-rose-600 to-red-600 hover:opacity-95 text-white font-extrabold text-sm flex items-center justify-center gap-2.5 shadow-xl shadow-red-600/30 transition transform active:scale-[0.98]">
+            <i class="fa-solid fa-download text-base"></i>
+            <span>DOWNLOAD VIDEO (.MP4)</span>
+          </button>
+
+          <!-- SECONDARY BUTTON -->
+          <button id="btnCopyCaption" class="w-full py-2.5 px-3 rounded-xl bg-[#222736] hover:bg-[#2d344a] text-gray-200 font-semibold text-xs flex items-center justify-center gap-2 border border-gray-700/60 transition">
+            <i class="fa-solid fa-copy text-amber-400"></i>
+            <span>Salin Caption Instagram / WA</span>
+          </button>
+
+          <!-- PILIHAN FOTO TWIBBON STATIS & TWIBBONIZE -->
+          <div class="pt-3 border-t border-[#252a3b] space-y-2">
+            <div class="flex items-center justify-between text-[11px] text-gray-400">
+              <span>Butuh versi foto profil biasa?</span>
+              <span class="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-1.5 py-0.5 rounded font-mono">Instan 0.1s</span>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="btnDownloadPhoto" type="button" class="py-2.5 px-2 rounded-xl bg-[#1f2330] hover:bg-[#2a3042] text-gray-200 font-semibold text-xs flex items-center justify-center gap-1.5 border border-gray-700/60 transition" title="Download Foto Twibbon PNG langsung tanpa antrean video">
+                <i class="fa-solid fa-file-image text-emerald-400"></i>
+                <span>Download Foto</span>
+              </button>
+              
+              <a id="btnOpenTwibbonize" href="{{ config.twibbonize_url or 'https://www.twibbonize.com' }}" target="_blank" rel="noopener noreferrer" class="py-2.5 px-2 rounded-xl bg-[#1f2330] hover:bg-[#2a3042] text-gray-200 font-semibold text-xs flex items-center justify-center gap-1.5 border border-gray-700/60 transition" title="Buka Twibbonize resmi">
+                <i class="fa-solid fa-arrow-up-right-from-square text-sky-400"></i>
+                <span>Twibbonize</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- LIVE CAMERA / SELFIE MODAL -->
+  <div id="cameraModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-[#181a24] border border-[#2c3144] rounded-2xl p-4 max-w-sm w-full shadow-2xl relative flex flex-col items-center">
+      
+      <div class="w-full flex items-center justify-between mb-3 px-1">
+        <h3 class="text-sm font-bold text-white flex items-center gap-2">
+          <i class="fa-solid fa-camera text-red-500"></i> Ambil Foto Selfie
+        </h3>
+        <div class="flex items-center gap-2">
+          <button id="btnSwitchCamera" class="hidden w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs flex items-center justify-center transition" title="Ganti Kamera">
+            <i class="fa-solid fa-camera-rotate"></i>
+          </button>
+          <button id="btnCloseCameraModal" class="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs flex items-center justify-center transition">
+            <i class="fa-solid fa-xmark text-sm"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- LIVE CAMERA VIEWPORT (1:1 square preview matching twibbon circle) -->
+      <div class="w-full aspect-square rounded-xl overflow-hidden bg-black relative border border-gray-700/60 shadow-inner flex items-center justify-center">
+        <video id="cameraStream" autoplay playsinline muted class="w-full h-full object-cover transform -scale-x-100"></video>
+        
+        <!-- Circular Guideline Overlay -->
+        <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+          <div class="w-[72%] aspect-square rounded-full border-2 border-dashed border-red-500/80 bg-red-500/5 shadow-[0_0_0_9999px_rgba(0,0,0,0.4)]"></div>
+        </div>
+
+        <!-- Camera Loading Spinner -->
+        <div id="cameraLoading" class="absolute inset-0 bg-black/80 flex flex-col items-center justify-center gap-2 text-xs text-gray-300">
+          <div class="w-8 h-8 border-3 border-red-500 border-t-transparent rounded-full animate-spin"></div>
+          <span>Membuka kamera...</span>
+        </div>
+      </div>
+
+      <p class="text-[11px] text-gray-400 mt-2.5 text-center">
+        Posisikan wajah Anda di dalam lingkaran panduan
+      </p>
+
+      <!-- SHUTTER BUTTON -->
+      <div class="mt-4 flex items-center justify-center gap-4 w-full">
+        <button id="btnCapturePhoto" class="w-16 h-16 rounded-full bg-red-600 hover:bg-red-500 text-white flex items-center justify-center shadow-lg shadow-red-600/40 border-4 border-white/20 transition transform active:scale-95" title="Jepret Foto">
+          <i class="fa-solid fa-camera text-2xl"></i>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- RENDER PROGRESS MODAL -->
+  <div id="renderModal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-[#181a24] border border-[#2c3144] rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl relative">
+      <div class="w-16 h-16 rounded-full bg-red-600/20 border-2 border-red-500/40 mx-auto flex items-center justify-center mb-4">
+        <i class="fa-solid fa-film text-2xl text-red-500 animate-pulse"></i>
+      </div>
+      <h3 class="text-base font-bold text-white">Memproses Video Twibbon...</h3>
+      <p class="text-xs text-gray-400 mt-1">Menggabungkan foto dengan animasi Full HD 1080p dan audio suara.</p>
+
+      <!-- PROGRESS BAR -->
+      <div class="w-full bg-gray-800 h-2.5 rounded-full overflow-hidden mt-5">
+        <div id="renderProgressBar" class="bg-gradient-to-r from-red-600 to-rose-500 h-full w-0 transition-all duration-300"></div>
+      </div>
+      <p id="renderStatusText" class="text-[11px] text-gray-400 mt-2 font-mono">Menyiapkan frame...</p>
+    </div>
+  </div>
+
+  <!-- SHARE / QR CODE MODAL -->
+  <div id="shareModal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-[#181a24] border border-[#2c3144] rounded-2xl p-6 max-w-md w-full shadow-2xl relative">
+      <button id="btnCloseShareModal" class="absolute top-4 right-4 text-gray-400 hover:text-white text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <div class="text-center mb-4">
+        <div class="w-12 h-12 rounded-xl bg-red-600/20 border border-red-500/40 text-red-400 flex items-center justify-center mx-auto mb-2 text-xl">
+          <i class="fa-solid fa-mobile-screen-button"></i>
+        </div>
+        <h3 class="text-lg font-bold text-white">Buka di Smartphone / Teman</h3>
+        <p class="text-xs text-gray-400 mt-0.5">Pastikan terhubung ke Wi-Fi / Hotspot yang sama</p>
+      </div>
+
+      <div class="flex justify-center p-4 bg-white rounded-xl shadow-inner mb-4 w-48 h-48 mx-auto" id="qrcodeContainer"></div>
+
+      <div class="bg-[#12141c] p-3 rounded-xl border border-gray-800 flex items-center justify-between gap-2">
+        <div class="truncate text-xs font-mono text-gray-300" id="networkUrlText">{{ network_url }}</div>
+        <button id="btnCopyNetworkUrl" class="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white text-xs font-semibold whitespace-nowrap transition">
+          <i class="fa-solid fa-copy mr-1"></i> Salin Link
+        </button>
+      </div>
+
+      <p class="text-[11px] text-gray-500 text-center mt-3">
+        Kamera HP tinggal di-scan ke QR code di atas untuk langsung membuka twibbon ini!
+      </p>
+    </div>
+  </div>
+
+  <!-- SETTINGS / ADMIN MODAL -->
+  <div id="settingsModal" class="fixed inset-0 bg-black/85 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-[#181a24] border border-[#2c3144] rounded-2xl p-6 max-w-lg w-full shadow-2xl relative max-h-[90vh] overflow-y-auto">
+      <button id="btnCloseSettingsModal" class="absolute top-4 right-4 text-gray-400 hover:text-white text-lg">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <h3 class="text-base font-bold text-white mb-4 flex items-center gap-2">
+        <i class="fa-solid fa-sliders text-red-500"></i> Pengaturan Kampanye Twibbon
+      </h3>
+
+      <div class="space-y-3.5 text-xs">
+        <div>
+          <label class="block text-gray-400 font-semibold mb-1">PIN Admin <span class="text-red-400">* (Wajib diisi)</span></label>
+          <input type="password" id="cfgAdminPin" class="w-full bg-[#12141c] border border-gray-700 rounded-lg px-3 py-2 text-white font-mono" placeholder="Masukkan PIN Admin (bawaan: adhigana2026)">
+        </div>
+
+        <div>
+          <label class="block text-gray-400 font-semibold mb-1">Judul Acara / Kampanye</label>
+          <input type="text" id="cfgTitle" class="w-full bg-[#12141c] border border-gray-700 rounded-lg px-3 py-2 text-white" value="{{ config.campaign_title }}">
+        </div>
+
+        <div>
+          <label class="block text-gray-400 font-semibold mb-1">Subjudul / Fakultas</label>
+          <input type="text" id="cfgSubtitle" class="w-full bg-[#12141c] border border-gray-700 rounded-lg px-3 py-2 text-white" value="{{ config.campaign_subtitle }}">
+        </div>
+
+        <div>
+          <label class="block text-gray-400 font-semibold mb-1">Link Twibbonize Resmi (Versi Foto Statis)</label>
+          <input type="url" id="cfgTwibbonizeUrl" class="w-full bg-[#12141c] border border-gray-700 rounded-lg px-3 py-2 text-white" value="{{ config.twibbonize_url or '' }}" placeholder="https://www.twibbonize.com/adhiganainformatika2026">
+        </div>
+
+        <div>
+          <label class="block text-gray-400 font-semibold mb-1">Template Caption Bawaan (Instagram/WA)</label>
+          <textarea id="cfgCaption" rows="4" class="w-full bg-[#12141c] border border-gray-700 rounded-lg px-3 py-2 text-white font-sans">{{ config.caption_template }}</textarea>
+        </div>
+
+        <div class="pt-2 border-t border-gray-800">
+          <label class="block text-gray-400 font-semibold mb-1">Ganti Video Template (Opsional)</label>
+          <input type="file" id="cfgNewVideo" accept="video/mp4,video/quicktime" class="block w-full text-xs text-gray-400 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-gray-800 file:text-gray-300 hover:file:bg-gray-700">
+          <p class="text-[10px] text-gray-500 mt-1">Video MP4 dengan area chroma key hitam/hijau.</p>
+        </div>
+      </div>
+
+      <div class="mt-5 flex justify-end gap-2">
+        <button id="btnCancelSettings" class="px-3.5 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 font-semibold text-xs">Batal</button>
+        <button id="btnSaveSettings" class="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-semibold text-xs shadow-lg shadow-red-600/30">Simpan Perubahan</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastNotification" class="fixed bottom-5 right-5 bg-[#1f2433] text-white px-4 py-2.5 rounded-xl border border-gray-700 shadow-2xl flex items-center gap-2.5 text-xs transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+    <i class="fa-solid fa-circle-check text-green-400 text-sm" id="toastIcon"></i>
+    <span id="toastMessage">Tindakan berhasil</span>
+  </div>
+
+  <footer class="border-t border-[#1c202d] py-4 text-center text-xs text-gray-500">
+    Video Twibbon Engine &copy; 2026 • Dirancang untuk Kemudahan Peserta Acara
+  </footer>
+
+  <!-- PASS SERVER CONFIG TO JS -->
+  <script>
+    window.APP_CONFIG = {
+      networkUrl: {{ network_url | tojson }},
+      captionTemplate: {{ config.caption_template | tojson }},
+      twibbonizeUrl: {{ (config.twibbonize_url or 'https://www.twibbonize.com') | tojson }},
+      circleCenterX: {{ config.circle_center_x }},
+      circleCenterY: {{ config.circle_center_y }},
+      circleRadius: {{ config.circle_radius }},
+      staticFrameUrl: "{{ url_for('static', filename='images/frame.png') }}",
+      videoUrl: "{{ url_for('static', filename='videos/template.mp4') }}"
+    };
+  </script>
+  <script src="{{ url_for('static', filename='js/app.js') }}?v=7"></script>
+</body>
+</html>

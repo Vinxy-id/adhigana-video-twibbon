@@ -1,0 +1,88 @@
+/* Custom Styling for Video Twibbon Creator */
+
+/* Custom Range Slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: #232736;
+  outline: none;
+  border-radius: 9999px;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ef4444;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+  transition: transform 0.1s, background-color 0.1s;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+  background: #f87171;
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ef4444;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.6);
+  border: none;
+}
+
+/* Touch Canvas Smoothing */
+#previewContainer {
+  touch-action: none; /* Prevents scroll while dragging/pinching photo */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Glowing Border for Active Twibbon Frame */
+#previewContainer:focus, #previewContainer:hover {
+  box-shadow: 0 0 25px -5px rgba(239, 68, 68, 0.25);
+}
+
+/* Scrollbar Customization */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0f1118;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #2a2f42;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #3b425d;
+}
+
+/* Pulsing effect for play button */
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(239, 68, 68, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+.pulse-button {
+  animation: pulse-ring 2s infinite;
+}
