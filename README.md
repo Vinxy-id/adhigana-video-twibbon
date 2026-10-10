@@ -1,3 +1,13 @@
+---
+title: Adhigana Video Twibbon 2026
+emoji: 🎬
+colorFrom: red
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 🎬 Video Twibbon Creator - Adhigana Informatika 2026
 Aplikasi web pembuat Video Twibbon interaktif mirip cara kerja **Twibbonize**. Memungkinkan peserta/mahasiswa memasang foto mereka ke dalam video twibbon secara otomatis **tanpa perlu aplikasi edit video (CapCut/Premiere) dan tanpa perlu setting chroma key manual**.
 

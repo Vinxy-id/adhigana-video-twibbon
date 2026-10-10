@@ -5,21 +5,27 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
-WORKDIR /app
+# Set up non-root user (required for Hugging Face Spaces compatibility)
+RUN useradd -m -u 1000 user
+USER user
+ENV HOME=/home/user \
+    PATH=/home/user/.local/bin:$PATH
+
+WORKDIR /home/user/app
 
 # Install python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY --chown=user requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Copy application source code
-COPY . .
+COPY --chown=user . .
 
 # Ensure temp directory exists
 RUN mkdir -p temp
 
-# Expose port and configure production WSGI runner
-ENV PORT=5000
-EXPOSE 5000
+# Expose port (7860 for Hugging Face Spaces, dynamically overridden by $PORT on other hosts)
+ENV PORT=7860
+EXPOSE 7860
 
-# Gunicorn with threads and extended timeout for FFmpeg rendering
+# Run with Gunicorn WSGI server
 CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 180 app:app
