@@ -5,7 +5,7 @@ RUN apt-get update && \
     apt-get install -y --no-install-recommends ffmpeg && \
     rm -rf /var/lib/apt/lists/*
 
-# Set up non-root user (required for Hugging Face Spaces compatibility)
+# Set up non-root user
 RUN useradd -m -u 1000 user
 USER user
 ENV HOME=/home/user \
@@ -23,9 +23,9 @@ COPY --chown=user . .
 # Ensure temp directory exists
 RUN mkdir -p temp
 
-# Expose port (7860 for Hugging Face Spaces, dynamically overridden by $PORT on other hosts)
-ENV PORT=7860
-EXPOSE 7860
+# Default port (will be overridden by $PORT on cloud platforms like Render / Railway)
+ENV PORT=5000
+EXPOSE 5000
 
 # Run with Gunicorn WSGI server
 CMD exec gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 180 app:app

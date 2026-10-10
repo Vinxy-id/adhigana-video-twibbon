@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: adhigana-video-twibbon
+    env: docker
+    plan: free
+    region: singapore
+    dockerfilePath: Dockerfile
