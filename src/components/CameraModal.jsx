@@ -71,26 +71,26 @@ export default function CameraModal({ isOpen, onClose, onCapture }) {
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
-      <div className="bg-[#161922] border border-[#2b3040] rounded-2xl max-w-sm w-full p-5 text-center shadow-2xl relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/85 backdrop-blur-sm animate-fade-in">
+      <div className="bg-[#161922] border border-[#2b3040] rounded-2xl max-w-sm w-full p-4 sm:p-5 text-center shadow-2xl relative max-h-[95vh] overflow-y-auto">
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-white p-1 rounded-lg transition"
+          className="absolute top-3.5 right-3.5 sm:top-4 sm:right-4 text-gray-400 hover:text-white p-1 rounded-lg transition"
         >
           <X className="w-5 h-5" />
         </button>
 
-        <h3 className="text-base font-bold text-white font-display mb-3 flex items-center justify-center gap-2">
+        <h3 className="text-sm sm:text-base font-bold text-white font-display mb-2.5 sm:mb-3 flex items-center justify-center gap-2">
           <Camera className="w-4 h-4 text-red-400" />
           Ambil Foto Selfie
         </h3>
 
         {cameraError ? (
-          <div className="bg-red-950/40 border border-red-800 text-red-300 text-xs p-4 rounded-xl mb-4">
+          <div className="bg-red-950/40 border border-red-800 text-red-300 text-xs p-3.5 sm:p-4 rounded-xl mb-3 sm:mb-4">
             {cameraError}
           </div>
         ) : (
-          <div className="relative aspect-square w-full bg-black rounded-xl overflow-hidden mb-4 border border-gray-800">
+          <div className="relative aspect-square w-full max-h-[50vh] bg-black rounded-xl overflow-hidden mb-3 sm:mb-4 border border-gray-800">
             <video
               ref={videoRef}
               autoPlay
@@ -105,10 +105,10 @@ export default function CameraModal({ isOpen, onClose, onCapture }) {
           </div>
         )}
 
-        <div className="flex items-center justify-center gap-3">
+        <div className="flex items-center justify-center gap-2.5 sm:gap-3">
           <button
             onClick={toggleFacingMode}
-            className="p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs transition flex items-center gap-1.5"
+            className="p-2.5 sm:p-3 rounded-xl bg-gray-800 hover:bg-gray-700 text-gray-200 text-xs transition flex items-center gap-1.5 shrink-0"
             title="Putar Kamera Depan/Belakang"
           >
             <RefreshCw className="w-4 h-4" />
@@ -116,7 +116,7 @@ export default function CameraModal({ isOpen, onClose, onCapture }) {
           <button
             onClick={handleCapture}
             disabled={!!cameraError}
-            className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 disabled:bg-gray-800 text-white font-semibold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-red-600/30"
+            className="flex-1 py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl bg-red-600 hover:bg-red-500 disabled:bg-gray-800 text-white font-semibold text-xs sm:text-sm transition flex items-center justify-center gap-2 shadow-lg shadow-red-600/30 active:scale-98"
           >
             <Camera className="w-4 h-4" />
             Ambil Foto Sekarang

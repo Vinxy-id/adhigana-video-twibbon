@@ -406,7 +406,7 @@ export default function TwibbonCanvas({
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
-        className="relative w-full max-w-[460px] aspect-square rounded-2xl overflow-hidden bg-[#12141c] border-2 border-[#2b3040] shadow-2xl shadow-red-950/20 touch-none cursor-grab active:cursor-grabbing select-none"
+        className="relative w-full max-w-[360px] xs:max-w-[400px] sm:max-w-[440px] lg:max-w-[460px] aspect-square rounded-2xl overflow-hidden bg-[#12141c] border-2 border-[#2b3040] shadow-2xl shadow-red-950/20 touch-none cursor-grab active:cursor-grabbing select-none"
       >
         <canvas
           ref={canvasRef}
@@ -419,18 +419,18 @@ export default function TwibbonCanvas({
         {!userImg && (
           <div
             onClick={onPickPhoto}
-            className="absolute inset-0 bg-[#0c0d12]/85 backdrop-blur-[2px] flex flex-col items-center justify-center p-6 text-center cursor-pointer transition hover:bg-[#0c0d12]/75"
+            className="absolute inset-0 bg-[#0c0d12]/85 backdrop-blur-[2px] flex flex-col items-center justify-center p-4 sm:p-6 text-center cursor-pointer transition hover:bg-[#0c0d12]/75"
           >
-            <div className="w-16 h-16 rounded-2xl bg-red-600/20 text-red-400 flex items-center justify-center mb-4 ring-8 ring-red-600/10 animate-pulse">
-              <ImagePlus className="w-8 h-8" />
+            <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-2xl bg-red-600/20 text-red-400 flex items-center justify-center mb-3 sm:mb-4 ring-8 ring-red-600/10 animate-pulse">
+              <ImagePlus className="w-6 h-6 sm:w-8 sm:h-8" />
             </div>
-            <h3 className="text-base sm:text-lg font-bold text-white font-display mb-1">
+            <h3 className="text-sm sm:text-base font-bold text-white font-display mb-1">
               Belum Ada Foto Terpasang
             </h3>
-            <p className="text-xs text-gray-400 max-w-xs mb-4">
+            <p className="text-[11px] sm:text-xs text-gray-400 max-w-xs mb-3 sm:mb-4 px-2">
               Ketuk di sini atau tombol upload di bawah untuk memasang foto Anda ke dalam twibbon!
             </p>
-            <span className="px-4 py-2 rounded-xl bg-red-600 text-white font-semibold text-xs shadow-lg shadow-red-600/30 flex items-center gap-1.5">
+            <span className="px-3.5 sm:px-4 py-1.5 sm:py-2 rounded-xl bg-red-600 text-white font-semibold text-xs shadow-lg shadow-red-600/30 flex items-center gap-1.5">
               <Sparkles className="w-3.5 h-3.5" /> Pilih Foto Sekarang
             </span>
           </div>
@@ -438,7 +438,7 @@ export default function TwibbonCanvas({
 
         {/* Drag & Pinch hint badge */}
         {userImg && (
-          <div className="absolute top-3 left-3 pointer-events-none px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[11px] font-medium text-gray-300 border border-white/10 flex items-center gap-1.5">
+          <div className="absolute top-2.5 left-2.5 pointer-events-none px-2 sm:px-2.5 py-1 rounded-full bg-black/60 backdrop-blur-md text-[10px] sm:text-[11px] font-medium text-gray-300 border border-white/10 flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
             Geser & Cubit untuk atur foto
           </div>
@@ -446,14 +446,14 @@ export default function TwibbonCanvas({
       </div>
 
       {/* Video Playback Bar */}
-      <div className="w-full max-w-[460px] mt-3 bg-[#161922] border border-[#2b3040] rounded-xl p-3 flex flex-col gap-2">
-        <div className="flex items-center gap-3">
+      <div className="w-full max-w-[360px] xs:max-w-[400px] sm:max-w-[440px] lg:max-w-[460px] mt-2.5 sm:mt-3 bg-[#161922] border border-[#2b3040] rounded-xl p-2.5 sm:p-3 flex flex-col gap-2">
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={togglePlay}
-            className="w-9 h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white flex items-center justify-center transition shrink-0 shadow-md shadow-red-600/20 active:scale-95"
+            className="w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-red-600 hover:bg-red-500 text-white flex items-center justify-center transition shrink-0 shadow-md shadow-red-600/20 active:scale-95"
             title={isPlaying ? 'Pause Preview' : 'Play Preview'}
           >
-            {isPlaying ? <Pause className="w-4 h-4 fill-white" /> : <Play className="w-4 h-4 fill-white ml-0.5" />}
+            {isPlaying ? <Pause className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white" /> : <Play className="w-3.5 h-3.5 sm:w-4 sm:h-4 fill-white ml-0.5" />}
           </button>
 
           <input
@@ -463,16 +463,16 @@ export default function TwibbonCanvas({
             step="0.05"
             value={currentTime}
             onChange={handleTimelineChange}
-            className="flex-1 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+            className="flex-1 h-1.5 sm:h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-red-600"
           />
 
-          <span className="text-[11px] font-mono text-gray-400 shrink-0">
+          <span className="text-[10px] sm:text-[11px] font-mono text-gray-400 shrink-0 tabular-nums">
             {formatTime(currentTime)} / {formatTime(duration)}
           </span>
 
           <button
             onClick={toggleMute}
-            className="p-1.5 text-gray-400 hover:text-white rounded-lg transition shrink-0"
+            className="p-1 sm:p-1.5 text-gray-400 hover:text-white rounded-lg transition shrink-0"
             title={isMuted ? 'Nyalakan Audio' : 'Bisukan Audio'}
           >
             {isMuted ? <VolumeX className="w-4 h-4 text-red-400" /> : <Volume2 className="w-4 h-4" />}
@@ -480,39 +480,39 @@ export default function TwibbonCanvas({
         </div>
 
         {/* Jump Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
-          <span className="text-[10px] text-gray-400 font-medium shrink-0 mr-1">Loncat ke:</span>
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth pt-0.5 -mx-0.5 px-0.5 touch-pan-x">
+          <span className="text-[10px] text-gray-400 font-medium shrink-0 mr-0.5">Loncat:</span>
           <button
             onClick={() => jumpTo(11.0)}
-            className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition shrink-0 inline-flex items-center gap-1.5 ${
+            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[9px] sm:text-[10px] font-semibold border transition shrink-0 inline-flex items-center gap-1 ${
               Math.abs(currentTime - 11.0) < 0.5
                 ? 'bg-red-950 text-red-300 border-red-700'
                 : 'bg-[#1f2330] text-gray-300 border-gray-700 hover:bg-gray-700'
             }`}
           >
-            <Crosshair className="w-3.5 h-3.5 text-red-400" />
+            <Crosshair className="w-3 h-3 text-red-400 shrink-0" />
             <span>11s (Frame Twibbon)</span>
           </button>
           <button
             onClick={() => jumpTo(1.5)}
-            className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition shrink-0 inline-flex items-center gap-1.5 ${
+            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[9px] sm:text-[10px] font-semibold border transition shrink-0 inline-flex items-center gap-1 ${
               Math.abs(currentTime - 1.5) < 0.5
                 ? 'bg-red-950 text-red-300 border-red-700'
                 : 'bg-[#1f2330] text-gray-300 border-gray-700 hover:bg-gray-700'
             }`}
           >
-            <Laptop className="w-3.5 h-3.5 text-blue-400" />
+            <Laptop className="w-3 h-3 text-blue-400 shrink-0" />
             <span>1.5s (Intro Laptop)</span>
           </button>
           <button
             onClick={() => jumpTo(7.0)}
-            className={`px-2.5 py-1 rounded-lg text-[10px] font-semibold border transition shrink-0 inline-flex items-center gap-1.5 ${
+            className={`px-2 sm:px-2.5 py-1 rounded-lg text-[9px] sm:text-[10px] font-semibold border transition shrink-0 inline-flex items-center gap-1 ${
               Math.abs(currentTime - 7.0) < 0.5
                 ? 'bg-red-950 text-red-300 border-red-700'
                 : 'bg-[#1f2330] text-gray-300 border-gray-700 hover:bg-gray-700'
             }`}
           >
-            <Film className="w-3.5 h-3.5 text-amber-400" />
+            <Film className="w-3 h-3 text-amber-400 shrink-0" />
             <span>7s (Judul)</span>
           </button>
         </div>

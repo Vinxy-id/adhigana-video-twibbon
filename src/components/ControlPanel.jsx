@@ -80,7 +80,7 @@ export default function ControlPanel({
     : 100;
 
   return (
-    <div className="w-full max-w-xl flex flex-col gap-4">
+    <div className="w-full max-w-xl flex flex-col gap-3 sm:gap-4">
       {/* Hidden file input */}
       <input
         ref={fileInputRef}
@@ -91,33 +91,33 @@ export default function ControlPanel({
       />
 
       {/* 1. Upload & Camera Buttons */}
-      <div className="grid grid-cols-2 gap-3">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
         <button
           onClick={() => fileInputRef.current?.click()}
-          className="py-3 px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-600/20 transition active:scale-98"
+          className="py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg shadow-red-600/20 transition active:scale-98"
         >
-          <Upload className="w-4 h-4" />
-          <span>{hasPhoto ? 'Ganti Foto' : 'Pilih Foto Galeri'}</span>
+          <Upload className="w-4 h-4 shrink-0" />
+          <span className="truncate">{hasPhoto ? 'Ganti Foto' : 'Pilih Foto Galeri'}</span>
         </button>
 
         <button
           onClick={onOpenCamera}
-          className="py-3 px-4 rounded-xl bg-[#1f2330] hover:bg-[#2b3042] text-gray-200 border border-gray-700 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition active:scale-98"
+          className="py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl bg-[#1f2330] hover:bg-[#2b3042] text-gray-200 border border-gray-700 font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 sm:gap-2 transition active:scale-98"
         >
-          <Camera className="w-4 h-4 text-red-400" />
-          <span>Foto Selfie</span>
+          <Camera className="w-4 h-4 text-red-400 shrink-0" />
+          <span className="truncate">Foto Selfie</span>
         </button>
       </div>
 
       {/* 2. Photo Adjustment Sliders & Tools */}
-      <div className="bg-[#161922] border border-[#2b3040] rounded-2xl p-4 flex flex-col gap-3">
-        <h4 className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
-          <Crosshair className="w-3.5 h-3.5 text-red-400" /> Atur Posisi & Ukuran Foto
+      <div className="bg-[#161922] border border-[#2b3040] rounded-2xl p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3">
+        <h4 className="text-[11px] sm:text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5">
+          <Crosshair className="w-3.5 h-3.5 text-red-400 shrink-0" /> Atur Posisi & Ukuran Foto
         </h4>
 
         {/* Zoom Slider */}
         <div className="flex flex-col gap-1">
-          <div className="flex justify-between text-xs text-gray-400">
+          <div className="flex justify-between text-[11px] sm:text-xs text-gray-400">
             <span className="flex items-center gap-1">
               <ZoomIn className="w-3.5 h-3.5" /> Perbesar (Zoom)
             </span>
@@ -131,13 +131,13 @@ export default function ControlPanel({
             disabled={!hasPhoto}
             value={photoState.baseScale > 0 ? photoState.scale / photoState.baseScale : 1}
             onChange={handleZoomChange}
-            className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-40"
+            className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-40 accent-red-600"
           />
         </div>
 
         {/* Rotate Slider */}
         <div className="flex flex-col gap-1">
-          <div className="flex justify-between text-xs text-gray-400">
+          <div className="flex justify-between text-[11px] sm:text-xs text-gray-400">
             <span className="flex items-center gap-1">
               <RotateCw className="w-3.5 h-3.5" /> Putar (Rotasi)
             </span>
@@ -151,59 +151,59 @@ export default function ControlPanel({
             disabled={!hasPhoto}
             value={photoState.rotation}
             onChange={handleRotateChange}
-            className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-40"
+            className="w-full h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer disabled:opacity-40 accent-red-600"
           />
         </div>
 
         {/* Quick Transform Buttons */}
-        <div className="grid grid-cols-4 gap-2 pt-1">
+        <div className="grid grid-cols-4 gap-1.5 sm:gap-2 pt-0.5">
           <button
             onClick={centerPhoto}
             disabled={!hasPhoto}
-            className="py-1.5 px-2 rounded-lg bg-[#1f2330] hover:bg-[#2b3042] text-[11px] font-medium text-gray-300 border border-gray-700 disabled:opacity-40 flex items-center justify-center gap-1 transition"
+            className="py-1.5 px-1 sm:px-2 rounded-lg bg-[#1f2330] hover:bg-[#2b3042] text-[10px] sm:text-[11px] font-medium text-gray-300 border border-gray-700 disabled:opacity-40 flex items-center justify-center gap-1 transition"
             title="Pusatkan Foto"
           >
-            <Crosshair className="w-3 h-3 text-red-400" />
-            <span>Tengah</span>
+            <Crosshair className="w-3 h-3 text-red-400 shrink-0" />
+            <span className="truncate">Tengah</span>
           </button>
 
           <button
             onClick={fitCircle}
             disabled={!hasPhoto}
-            className="py-1.5 px-2 rounded-lg bg-[#1f2330] hover:bg-[#2b3042] text-[11px] font-medium text-gray-300 border border-gray-700 disabled:opacity-40 flex items-center justify-center gap-1 transition"
+            className="py-1.5 px-1 sm:px-2 rounded-lg bg-[#1f2330] hover:bg-[#2b3042] text-[10px] sm:text-[11px] font-medium text-gray-300 border border-gray-700 disabled:opacity-40 flex items-center justify-center gap-1 transition"
             title="Pas-kan dengan Lingkaran"
           >
-            <Maximize2 className="w-3 h-3 text-blue-400" />
-            <span>Pas Lingkar</span>
+            <Maximize2 className="w-3 h-3 text-blue-400 shrink-0" />
+            <span className="truncate">Pas Lingkar</span>
           </button>
 
           <button
             onClick={rotate90}
             disabled={!hasPhoto}
-            className="py-1.5 px-2 rounded-lg bg-[#1f2330] hover:bg-[#2b3042] text-[11px] font-medium text-gray-300 border border-gray-700 disabled:opacity-40 flex items-center justify-center gap-1 transition"
+            className="py-1.5 px-1 sm:px-2 rounded-lg bg-[#1f2330] hover:bg-[#2b3042] text-[10px] sm:text-[11px] font-medium text-gray-300 border border-gray-700 disabled:opacity-40 flex items-center justify-center gap-1 transition"
             title="Putar 90 Derajat"
           >
-            <RotateCcw className="w-3 h-3 text-amber-400" />
+            <RotateCcw className="w-3 h-3 text-amber-400 shrink-0" />
             <span>+90°</span>
           </button>
 
           <button
             onClick={resetTransform}
             disabled={!hasPhoto}
-            className="py-1.5 px-2 rounded-lg bg-[#1f2330] hover:bg-[#2b3042] text-[11px] font-medium text-gray-300 border border-gray-700 disabled:opacity-40 flex items-center justify-center gap-1 transition"
+            className="py-1.5 px-1 sm:px-2 rounded-lg bg-[#1f2330] hover:bg-[#2b3042] text-[10px] sm:text-[11px] font-medium text-gray-300 border border-gray-700 disabled:opacity-40 flex items-center justify-center gap-1 transition"
             title="Reset Pengaturan"
           >
-            <RefreshCw className="w-3 h-3 text-gray-400" />
+            <RefreshCw className="w-3 h-3 text-gray-400 shrink-0" />
             <span>Reset</span>
           </button>
         </div>
       </div>
 
       {/* 3. Identitas Maba (Nama & Gugus Otomatis di Twibbon) */}
-      <div className="bg-[#161922] border border-[#2b3040] rounded-2xl p-4 flex flex-col gap-3">
+      <div className="bg-[#161922] border border-[#2b3040] rounded-2xl p-3 sm:p-4 flex flex-col gap-2.5 sm:gap-3">
         <div className="flex items-center justify-between">
-          <label className="text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5 cursor-pointer">
-            <User className="w-3.5 h-3.5 text-red-400" /> Tulis Nama di Twibbon (Opsional)
+          <label className="text-[11px] sm:text-xs font-bold text-gray-300 uppercase tracking-wider flex items-center gap-1.5 cursor-pointer">
+            <User className="w-3.5 h-3.5 text-red-400 shrink-0" /> Tulis Nama di Twibbon (Opsional)
           </label>
           <input
             type="checkbox"
@@ -222,7 +222,7 @@ export default function ControlPanel({
                 placeholder="Contoh: Budi Santoso"
                 value={mabaInfo.name}
                 onChange={(e) => setMabaInfo((prev) => ({ ...prev, name: e.target.value }))}
-                className="w-full bg-[#0d0f15] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500 transition"
+                className="w-full bg-[#0d0f15] border border-gray-700 rounded-xl px-3 py-2 text-base sm:text-xs text-white placeholder-gray-500 outline-none focus:border-red-500 transition"
               />
             </div>
             <div>
@@ -232,7 +232,7 @@ export default function ControlPanel({
                 placeholder="Contoh: Gugus 03 • Informatika"
                 value={mabaInfo.groupOrNim}
                 onChange={(e) => setMabaInfo((prev) => ({ ...prev, groupOrNim: e.target.value }))}
-                className="w-full bg-[#0d0f15] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 outline-none focus:border-red-500 transition"
+                className="w-full bg-[#0d0f15] border border-gray-700 rounded-xl px-3 py-2 text-base sm:text-xs text-white placeholder-gray-500 outline-none focus:border-red-500 transition"
               />
             </div>
           </div>
@@ -240,23 +240,23 @@ export default function ControlPanel({
       </div>
 
       {/* 4. Action Export Buttons (Foto, Video, Caption) */}
-      <div className="flex flex-col gap-2.5">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+      <div className="flex flex-col gap-2 sm:gap-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
           {/* Download Foto PNG */}
           <button
             onClick={onDownloadFoto}
-            className="py-3.5 px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition active:scale-98"
+            className="py-3 sm:py-3.5 px-3 sm:px-4 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20 transition active:scale-98"
           >
-            <Download className="w-4 h-4" />
+            <Download className="w-4 h-4 shrink-0" />
             <span>Download Foto (PNG HD)</span>
           </button>
 
           {/* Download Video MP4 */}
           <button
             onClick={onDownloadVideo}
-            className="py-3.5 px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-600/20 transition active:scale-98"
+            className="py-3 sm:py-3.5 px-3 sm:px-4 rounded-xl bg-gradient-to-r from-red-600 to-rose-600 hover:from-red-500 hover:to-rose-500 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-red-600/20 transition active:scale-98"
           >
-            <Film className="w-4 h-4" />
+            <Film className="w-4 h-4 shrink-0" />
             <span>Download Video (MP4)</span>
           </button>
         </div>
@@ -264,9 +264,9 @@ export default function ControlPanel({
         {/* Salin Caption Instagram */}
         <button
           onClick={onCopyCaption}
-          className="w-full py-3 px-4 rounded-xl bg-[#1f2330] hover:bg-[#2b3042] text-gray-200 border border-gray-700 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition active:scale-98"
+          className="w-full py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl bg-[#1f2330] hover:bg-[#2b3042] text-gray-200 border border-gray-700 font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 transition active:scale-98"
         >
-          <Copy className="w-4 h-4 text-purple-400" />
+          <Copy className="w-4 h-4 text-purple-400 shrink-0" />
           <span>Salin Caption Instagram Resmi</span>
         </button>
       </div>

@@ -17,6 +17,9 @@ export default {
       fontFamily: {
         sans: ['"Plus Jakarta Sans"', 'sans-serif'],
         display: ['"Space Grotesk"', 'sans-serif'],
+      },
+      screens: {
+        'xs': '380px',
       }
     },
   },

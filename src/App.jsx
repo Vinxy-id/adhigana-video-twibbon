@@ -522,23 +522,23 @@ export default function App() {
       />
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-6 flex-1 w-full flex flex-col items-center">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 flex-1 w-full flex flex-col items-center">
         {/* Banner Tagline */}
-        <div className="w-full text-center mb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-red-900/20 border border-red-700/30 text-xs font-semibold text-red-400 mb-2">
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+        <div className="w-full text-center mb-4 sm:mb-6">
+          <div className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full bg-red-900/20 border border-red-700/30 text-[10px] sm:text-xs font-semibold text-red-400 mb-1.5 sm:mb-2">
+            <span className="w-1.5 h-1.5 sm:w-2 sm:h-2 rounded-full bg-red-500 animate-pulse"></span>
             Auto Chroma Key • Foto & Video Twibbon 1080p
           </div>
-          <h2 className="text-2xl sm:text-3xl font-extrabold text-white font-display tracking-tight">
+          <h2 className="text-xl sm:text-2xl md:text-3xl font-extrabold text-white font-display tracking-tight px-2">
             {config.campaign_title}
           </h2>
-          <p className="text-xs sm:text-sm text-gray-400 max-w-lg mx-auto mt-1">
+          <p className="text-[11px] sm:text-xs md:text-sm text-gray-400 max-w-lg mx-auto mt-1 px-3">
             {config.description}
           </p>
         </div>
 
         {/* 2-Column Responsive Layout */}
-        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 items-start justify-items-center">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 lg:gap-8 items-start justify-items-center">
           {/* Left Column: Preview Canvas & Playback Bar */}
           <div className="lg:col-span-6 w-full flex justify-center">
             <TwibbonCanvas
