@@ -4,3 +4,7 @@ __pycache__
 .gitignore
 temp/*
 !temp/.gitkeep
+node_modules
+dist
+.env*
+.vercel

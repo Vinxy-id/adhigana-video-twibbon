@@ -187,7 +187,7 @@ export default function App() {
     }
   };
 
-  // 2. DOWNLOAD VIDEO - 100% CLIENT-SIDE DI HP/BROWSER DENGAN WEB AUDIO & FIX WEBM DURATION
+  // 2. DOWNLOAD VIDEO (SERVER MP4 HD UTAMA DENGAN FALLBACK PEREKAMAN BROWSER)
   const handleDownloadVideo = async () => {
     if (isRenderOpen) return; // Prevent double-click race conditions
     if (!userImageSrc) {
@@ -198,7 +198,95 @@ export default function App() {
     const video = videoRef.current;
     const canvas = canvasRef.current;
     const photoCanvas = photoCanvasRef.current;
-    if (!video || !canvas || !photoCanvas) return;
+    if (!photoCanvas) return;
+
+    setIsRenderOpen(true);
+    setRenderProgress(10);
+    setRenderStatus('Menyiapkan pemrosesan video MP4 HD...');
+
+    // A. METODE UTAMA: Render via Server FFmpeg (MP4 Asli H.264 + AAC + FastStart untuk Galeri HP)
+    let serverSuccess = false;
+    try {
+      setRenderProgress(20);
+      setRenderStatus('Menghubungkan ke pemroses video server...');
+
+      const photoBlob = await new Promise((resolve) => photoCanvas.toBlob(resolve, 'image/png'));
+      const formData = new FormData();
+      formData.append('photo', photoBlob, 'photo.png');
+
+      let p = 25;
+      const timer = setInterval(() => {
+        if (p < 88) {
+          p += 6;
+          setRenderProgress(p);
+          if (p > 50) {
+            setRenderStatus('Merender video MP4 1080p dengan FastStart...');
+          }
+        }
+      }, 350);
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000);
+
+      const res = await fetch('/api/render-video', {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      clearInterval(timer);
+
+      if (res.ok) {
+        setRenderProgress(96);
+        setRenderStatus('Menyempurnakan durasi (FastStart untuk Galeri HP)...');
+
+        const vBlob = await res.blob();
+        const url = URL.createObjectURL(vBlob);
+        const a = document.createElement('a');
+        const cleanTitle = (config.campaign_title || 'Twibbon').replace(/\s+/g, '_');
+        a.download = `Video_Twibbon_${cleanTitle}.mp4`;
+        a.href = url;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+        setRenderProgress(100);
+        setRenderStatus('Selesai! Video MP4 berhasil diunduh.');
+
+        setTimeout(() => {
+          setIsRenderOpen(false);
+          triggerCelebration();
+          showToast('Video Twibbon MP4 berhasil diunduh! Durasi pas 18 detik & siap putar di Galeri/WhatsApp.');
+        }, 500);
+        serverSuccess = true;
+        return;
+      } else {
+        console.warn('Server render returned status:', res.status, '- beralih ke perekaman browser...');
+      }
+    } catch (serverErr) {
+      console.warn('Server FFmpeg tidak terjangkau / offline, beralih ke render browser:', serverErr);
+    }
+
+    if (serverSuccess) return;
+
+    // B. METODE FALLBACK: Perekaman di browser HP/Client jika server offline / statis
+    await handleClientRecording(video, canvas);
+  };
+
+  const handleClientRecording = async (video, canvas) => {
+    if (!video || !canvas) {
+      setIsRenderOpen(false);
+      showToast('Gagal memproses video.', 'error');
+      return;
+    }
+
+    if (typeof window.MediaRecorder === 'undefined' || !canvas.captureStream) {
+      setIsRenderOpen(false);
+      showToast('Browser Anda tidak mendukung perekaman video HTML5.', 'error');
+      return;
+    }
 
     if (!video.paused) {
       video.pause();
@@ -206,20 +294,14 @@ export default function App() {
 
     const wasMuted = video.muted;
     try {
-      video.muted = true; // Keep video tag muted so no speaker echo occurs during recording
+      video.muted = true; // Hindari feedback echo saat proses perekaman canvas
     } catch (_) {}
 
-    setIsRenderOpen(true);
-    setRenderProgress(5);
-    setRenderStatus('Menyiapkan perekaman di perangkat Anda...');
-
-    // If browser doesn't support MediaRecorder or canvas captureStream, fallback to server
-    if (typeof window.MediaRecorder === 'undefined' || !canvas.captureStream) {
-      return handleServerRenderFallback();
-    }
+    setRenderProgress(10);
+    setRenderStatus('Menyiapkan perekaman di perangkat...');
 
     try {
-      // 1. Deteksi format video terbaik yang didukung browser/device
+      // 1. Deteksi format video terbaik
       const mimeCandidates = [
         'video/mp4;codecs=avc1,mp4a.40.2',
         'video/mp4;codecs=avc1',
@@ -230,10 +312,10 @@ export default function App() {
       ];
       const selectedMime = mimeCandidates.find((m) => MediaRecorder.isTypeSupported(m)) || '';
 
-      setRenderProgress(10);
+      setRenderProgress(15);
       setRenderStatus('Memuat audio digital HD...');
 
-      // 2. Web Audio API untuk inject audio digital murni 100% tanpa noise & tanpa pengaruh mute switch HP
+      // 2. Audio via Web Audio API
       let audioContext = null;
       let audioSourceNode = null;
       let audioTrack = null;
@@ -263,7 +345,6 @@ export default function App() {
         console.warn('Web Audio direct load note:', audioErr);
       }
 
-      // Fallback audio track from video element if Web Audio failed
       if (!audioTrack) {
         try {
           const vStream = video.captureStream ? video.captureStream() : (video.mozCaptureStream ? video.mozCaptureStream() : null);
@@ -284,7 +365,7 @@ export default function App() {
       // 4. Setup MediaRecorder
       const recorderOptions = {};
       if (selectedMime) recorderOptions.mimeType = selectedMime;
-      recorderOptions.videoBitsPerSecond = 8000000; // 8 Mbps High Definition
+      recorderOptions.videoBitsPerSecond = 8000000;
       if (audioTrack) recorderOptions.audioBitsPerSecond = 192000;
 
       const recorder = new MediaRecorder(combinedStream, recorderOptions);
@@ -316,12 +397,11 @@ export default function App() {
         setTimeout(() => {
           setIsRenderOpen(false);
           triggerCelebration();
-          showToast('Video Twibbon berhasil didownload!');
+          showToast(`Video Twibbon berhasil didownload (${ext.toUpperCase()})!`);
         }, 500);
       };
 
       recorder.onstop = async () => {
-        // Free stream hardware tracks
         try {
           canvasStream.getTracks().forEach((t) => t.stop());
           combinedStream.getTracks().forEach((t) => t.stop());
@@ -334,7 +414,6 @@ export default function App() {
           setRenderStatus('Menyempurnakan durasi video (18 detik)...');
           setRenderProgress(96);
           try {
-            // FIX DURASI WEBM DENGAN ysFixWebmDuration SUPAYA DIBACA 18 DETIK UTUH OLEH WHATSAPP & PLAYER HP
             const fixedBlob = await new Promise((resolve, reject) => {
               try {
                 ysFixWebmDuration(rawBlob, durationMs, (fixed) => resolve(fixed));
@@ -356,8 +435,8 @@ export default function App() {
         }
       };
 
-      // 5. Seek video ke detik 0 sebelum mulai merekam
-      setRenderProgress(15);
+      // 5. Seek video ke detik 0
+      setRenderProgress(20);
       setRenderStatus('Sinkronisasi frame awal video...');
 
       await new Promise((resolve) => {
@@ -371,9 +450,9 @@ export default function App() {
         setTimeout(resolve, 600);
       });
 
-      // 6. Mulai rekaman & audio
-      setRenderProgress(20);
-      setRenderStatus('Merekam animasi & audio di HP/Browser (0%)...');
+      // 6. Mulai perekaman
+      setRenderProgress(25);
+      setRenderStatus('Merekam animasi & audio di perangkat (0%)...');
 
       recorder.start(200);
       if (audioSourceNode) {
@@ -401,7 +480,7 @@ export default function App() {
 
       const progressInterval = setInterval(() => {
         if (video && video.currentTime > 0) {
-          const percent = Math.min(94, Math.round(20 + (video.currentTime / totalDuration) * 74));
+          const percent = Math.min(94, Math.round(25 + (video.currentTime / totalDuration) * 69));
           setRenderProgress(percent);
           setRenderStatus(`Merekam animasi & audio (${Math.round((video.currentTime / totalDuration) * 100)}%)...`);
         }
@@ -425,70 +504,9 @@ export default function App() {
 
     } catch (err) {
       try { video.muted = wasMuted; } catch (_) {}
-      console.error('Client recording error, falling back to server:', err);
-      handleServerRenderFallback();
-    }
-  };
-
-  // Fallback Server Render via FFmpeg jika browser lama tidak mendukung MediaRecorder
-  const handleServerRenderFallback = async () => {
-    const photoCanvas = photoCanvasRef.current;
-    if (!photoCanvas) {
+      console.error('Client recording error:', err);
       setIsRenderOpen(false);
-      showToast('Gagal memproses render video.', 'error');
-      return;
-    }
-
-    setRenderProgress(30);
-    setRenderStatus('Merender video di server FFmpeg...');
-
-    let p = 30;
-    const timer = setInterval(() => {
-      if (p < 88) {
-        p += 5;
-        setRenderProgress(p);
-      }
-    }, 400);
-
-    try {
-      const photoBlob = await new Promise((resolve) => photoCanvas.toBlob(resolve, 'image/png'));
-      const formData = new FormData();
-      formData.append('photo', photoBlob, 'photo.png');
-
-      const res = await fetch('/api/render-video', {
-        method: 'POST',
-        body: formData,
-      });
-
-      clearInterval(timer);
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.message || `Gagal render video (HTTP ${res.status})`);
-      }
-
-      setRenderProgress(100);
-      setRenderStatus('Selesai! Mengunduh video...');
-
-      const vBlob = await res.blob();
-      const url = URL.createObjectURL(vBlob);
-      const a = document.createElement('a');
-      a.download = `Video_Twibbon_${(config.campaign_title || 'Twibbon').replace(/\s+/g, '_')}.mp4`;
-      a.href = url;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-
-      setTimeout(() => {
-        setIsRenderOpen(false);
-        triggerCelebration();
-        showToast('Video Twibbon berhasil didownload!');
-      }, 600);
-    } catch (err) {
-      clearInterval(timer);
-      setIsRenderOpen(false);
-      console.error('Server FFmpeg fallback gagal:', err);
-      showToast(err.message || 'Gagal memproses video.', 'error');
+      showToast('Gagal memproses video: ' + err.message, 'error');
     }
   };
 

@@ -26,6 +26,7 @@ export default function TwibbonCanvas({
   const [duration, setDuration] = useState(15.0);
   const [userImg, setUserImg] = useState(null);
   const [staticFrameImg, setStaticFrameImg] = useState(null);
+  const [maskImg, setMaskImg] = useState(null);
 
   const CIRCLE_X = config.circle_center_x || 536;
   const CIRCLE_Y = config.circle_center_y || 543;
@@ -53,12 +54,17 @@ export default function TwibbonCanvas({
     return base.endsWith('/') ? base + clean : base + '/' + clean;
   };
 
-  // Load static frame image
+  // Load static frame image and exact cutout mask
   useEffect(() => {
     const frame = new Image();
     frame.crossOrigin = 'anonymous';
     frame.src = resolveAssetUrl(config.static_frame, 'images/frame.png');
     frame.onload = () => setStaticFrameImg(frame);
+
+    const mask = new Image();
+    mask.crossOrigin = 'anonymous';
+    mask.src = resolveAssetUrl('images/mask.png', 'images/mask.png');
+    mask.onload = () => setMaskImg(mask);
   }, [config.static_frame]);
 
   // Load user image
@@ -134,12 +140,16 @@ export default function TwibbonCanvas({
         vCtx.clearRect(0, 0, 1080, 1080);
         vCtx.drawImage(video, 0, 0, 1080, 1080);
 
-        // Punch out circular frame hole so user photo underneath shows through
+        // Punch out twibbon hole using exact mask so twibbon text (ADHIGANA) and ribbons remain on top
         vCtx.save();
         vCtx.globalCompositeOperation = 'destination-out';
-        vCtx.beginPath();
-        vCtx.arc(CIRCLE_X, CIRCLE_Y, CIRCLE_RADIUS - 3, 0, Math.PI * 2);
-        vCtx.fill();
+        if (maskImg && maskImg.complete && maskImg.naturalWidth > 0) {
+          vCtx.drawImage(maskImg, 0, 0, 1080, 1080);
+        } else {
+          vCtx.beginPath();
+          vCtx.arc(CIRCLE_X, CIRCLE_Y, CIRCLE_RADIUS - 3, 0, Math.PI * 2);
+          vCtx.fill();
+        }
         vCtx.restore();
 
         // Draw animated video frame overlay on top of photo
@@ -175,7 +185,7 @@ export default function TwibbonCanvas({
         ctx.drawImage(video, 0, 0, 1080, 1080);
       }
     }
-  }, [canvasRef, videoRef, photoCanvasRef, userImg, staticFrameImg, CIRCLE_X, CIRCLE_Y, CIRCLE_RADIUS, mabaInfo]);
+  }, [canvasRef, videoRef, photoCanvasRef, userImg, staticFrameImg, maskImg, CIRCLE_X, CIRCLE_Y, CIRCLE_RADIUS, mabaInfo]);
 
   // Re-render when photoState or userImg changes
   useEffect(() => {

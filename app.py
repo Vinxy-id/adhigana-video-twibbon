@@ -372,6 +372,7 @@ def render_video():
             "-c:a", "aac",
             "-b:a", "192k",
             "-shortest",
+            "-movflags", "+faststart",
             str(output_video_path)
         ]
 
@@ -461,6 +462,7 @@ def upload_template():
         "-pix_fmt", "yuv420p",
         "-c:a", "aac",
         "-b:a", "192k",
+        "-movflags", "+faststart",
         str(dest_path)
     ]
     try:

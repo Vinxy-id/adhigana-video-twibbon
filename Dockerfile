@@ -1,3 +1,12 @@
+# Stage 1: Build Frontend React Vite
+FROM node:20-slim AS frontend-builder
+WORKDIR /app
+COPY package*.json ./
+RUN npm install
+COPY . .
+RUN npm run build
+
+# Stage 2: Python Backend with FFmpeg
 FROM python:3.12-slim
 
 # Install system dependencies (ffmpeg is required for twibbon video compositing)
@@ -19,6 +28,9 @@ RUN pip install --no-cache-dir --user -r requirements.txt
 
 # Copy application source code
 COPY --chown=user . .
+
+# Copy compiled frontend dist from frontend-builder stage
+COPY --chown=user --from=frontend-builder /app/dist ./dist
 
 # Ensure temp directory exists
 RUN mkdir -p temp
