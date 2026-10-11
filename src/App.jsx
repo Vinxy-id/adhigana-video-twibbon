@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import confetti from 'canvas-confetti';
 import ysFixWebmDuration from 'fix-webm-duration';
+import { RefreshCw } from 'lucide-react';
 import Navbar from './components/Navbar';
 import TwibbonCanvas from './components/TwibbonCanvas';
 import ControlPanel from './components/ControlPanel';
@@ -38,6 +39,12 @@ export default function App() {
     groupOrNim: '',
     showOnTwibbon: false,
   });
+
+  // Auto-Update & Real-time Sync
+  const currentBuildTimeRef = useRef(
+    typeof __APP_BUILD_TIME__ !== 'undefined' ? __APP_BUILD_TIME__ : Date.now()
+  );
+  const [newVersionAvailable, setNewVersionAvailable] = useState(false);
 
   // Modals & Notifications
   const [isShareOpen, setIsShareOpen] = useState(false);
@@ -93,6 +100,76 @@ export default function App() {
   };
 
   const [isPhotoDownloading, setIsPhotoDownloading] = useState(false);
+
+  // LIVE AUTO-UPDATE & REAL-TIME CONFIG SYNC
+  useEffect(() => {
+    let isChecking = false;
+
+    const checkForUpdates = async () => {
+      if (isChecking) return;
+      isChecking = true;
+
+      try {
+        const versionUrl = resolveAssetUrl('/api/version', 'version.json');
+        const res = await fetch(`${versionUrl}?_t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: {
+            'Cache-Control': 'no-cache, no-store, must-revalidate',
+            'Pragma': 'no-cache',
+          },
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+
+          // 1. Live Sync Config (Judul, Caption, dll) langsung terupdate di layar tanpa perlu reload
+          if (data.config && typeof data.config === 'object') {
+            setConfig((prev) => {
+              if (JSON.stringify(prev) !== JSON.stringify(data.config)) {
+                return { ...prev, ...data.config };
+              }
+              return prev;
+            });
+          }
+
+          // 2. Deteksi Rilis Kode / Build Baru
+          const serverBuild = Number(data.buildTime);
+          const currentBuild = Number(currentBuildTimeRef.current);
+
+          if (serverBuild && currentBuild && serverBuild > currentBuild) {
+            setNewVersionAvailable(true);
+
+            // Jika user belum mengunggah foto dan tidak sedang proses download, reload otomatis secara senyap!
+            if (!userImageSrc && !isRenderOpen && !isPhotoDownloading) {
+              window.location.reload();
+            }
+          }
+        }
+      } catch (_) {
+        // Abaikan saat offline
+      } finally {
+        isChecking = false;
+      }
+    };
+
+    checkForUpdates();
+    const interval = setInterval(checkForUpdates, 25000);
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkForUpdates();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', checkForUpdates);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', checkForUpdates);
+    };
+  }, [userImageSrc, isRenderOpen, isPhotoDownloading]);
 
   // 1. DOWNLOAD FOTO STATIS (PNG HD 1080x1080) - 100% INSTAN DI BROWSER
   const handleDownloadPhoto = () => {
@@ -538,6 +615,20 @@ export default function App() {
         onOpenShare={() => setIsShareOpen(true)}
         onOpenGuide={() => setIsGuideOpen(true)}
       />
+
+      {/* Floating Auto-Update Banner (Tampil saat ada rilis baru jika user sedang mengedit foto) */}
+      {newVersionAvailable && (
+        <aside
+          role="status"
+          aria-live="polite"
+          onClick={() => window.location.reload()}
+          className="fixed top-16 z-50 left-1/2 -translate-x-1/2 bg-gradient-to-r from-red-600 via-rose-600 to-amber-600 text-white px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-full shadow-2xl text-[11px] sm:text-xs font-semibold flex items-center gap-2 animate-bounce cursor-pointer border border-white/20 select-none hover:scale-105 active:scale-95 transition"
+          title="Klik untuk memuat versi terbaru"
+        >
+          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+          <span>Pembaruan baru tersedia! Ketuk untuk perbarui</span>
+        </aside>
+      )}
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 flex-1 w-full flex flex-col items-center">

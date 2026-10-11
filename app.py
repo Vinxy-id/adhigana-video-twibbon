@@ -22,6 +22,9 @@ DIST_DIR = BASE_DIR / "dist"
 
 import hmac
 import shutil
+import hashlib
+
+APP_START_TIME = int(time.time() * 1000)
 
 # Concurrency & Rate Limiting
 RENDER_SEMAPHORE = threading.Semaphore(2)  # Max 2 concurrent FFmpeg rendering jobs
@@ -162,7 +165,11 @@ def add_security_headers(response):
 @app.route("/")
 def index():
     if (DIST_DIR / "index.html").exists():
-        return send_from_directory(DIST_DIR, "index.html")
+        resp = send_from_directory(DIST_DIR, "index.html")
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
     cfg = get_safe_config()
     local_ip = get_local_ip()
     port = int(os.environ.get("PORT", 5000))
@@ -173,7 +180,7 @@ def index():
         scheme = request.headers.get("X-Forwarded-Proto", request.scheme)
         network_url = f"{scheme}://{host}"
     is_admin = bool(request.args.get("admin"))
-    return render_template(
+    resp = render_template(
         "index.html",
         config=cfg,
         network_url=network_url,
@@ -181,12 +188,39 @@ def index():
         port=port,
         is_admin=is_admin
     )
+    return resp
 
 @app.route("/assets/<path:filename>")
 def serve_assets(filename):
-    if (DIST_DIR / "assets").exists():
-        return send_from_directory(DIST_DIR / "assets", filename)
+    if (DIST_DIR / "assets" / filename).exists():
+        resp = send_from_directory(DIST_DIR / "assets", filename)
+        resp.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return resp
     return "", 404
+
+@app.route("/api/version")
+@app.route("/version.json")
+def get_version():
+    v_file = DIST_DIR / "version.json"
+    build_time = APP_START_TIME
+    if v_file.exists():
+        try:
+            with open(v_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                build_time = data.get("buildTime", APP_START_TIME)
+        except Exception:
+            pass
+    cfg = load_config()
+    cfg_hash = hashlib.md5(json.dumps(cfg, sort_keys=True).encode("utf-8")).hexdigest()[:8]
+    resp = jsonify({
+        "buildTime": build_time,
+        "configHash": cfg_hash,
+        "config": get_safe_config()
+    })
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 @app.route("/favicon.ico")
 def favicon_ico():
