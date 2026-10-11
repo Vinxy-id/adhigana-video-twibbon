@@ -20,10 +20,15 @@ TEMP_DIR = BASE_DIR / "temp"
 TEMP_DIR.mkdir(exist_ok=True)
 DIST_DIR = BASE_DIR / "dist"
 
+import hmac
+import shutil
+
 # Concurrency & Rate Limiting
 RENDER_SEMAPHORE = threading.Semaphore(2)  # Max 2 concurrent FFmpeg rendering jobs
 IP_RENDER_TIMESTAMPS = {}
 IP_LOCK = threading.Lock()
+PIN_FAILED_ATTEMPTS = {}
+PIN_LOCK = threading.Lock()
 
 def load_config():
     if CONFIG_PATH.exists():
@@ -65,6 +70,15 @@ def get_admin_pin():
     return str(cfg.get("admin_pin", "adhigana2026")).strip()
 
 def verify_admin_pin(req):
+    client_ip = get_client_ip()
+    now = time.time()
+    
+    with PIN_LOCK:
+        # Rate limit PIN attempts: max 5 failed attempts per 5 minutes per IP
+        attempts = [t for t in PIN_FAILED_ATTEMPTS.get(client_ip, []) if (now - t) < 300]
+        if len(attempts) >= 5:
+            return False
+
     expected_pin = get_admin_pin()
     submitted = (
         req.headers.get("X-Admin-Pin") or
@@ -73,7 +87,16 @@ def verify_admin_pin(req):
         req.form.get("admin_pin") or
         ""
     )
-    return str(submitted).strip() == expected_pin
+    is_valid = hmac.compare_digest(str(submitted).strip(), expected_pin)
+
+    with PIN_LOCK:
+        if not is_valid:
+            attempts.append(now)
+            PIN_FAILED_ATTEMPTS[client_ip] = attempts
+        else:
+            PIN_FAILED_ATTEMPTS.pop(client_ip, None)
+
+    return is_valid
 
 def get_client_ip():
     forwarded = request.headers.get("X-Forwarded-For")
@@ -82,16 +105,19 @@ def get_client_ip():
     return request.remote_addr or "127.0.0.1"
 
 def check_ip_rate_limit(ip):
+    # Allow localhost without restrictive limits
+    if ip in ("127.0.0.1", "localhost", "::1"):
+        return True, ""
     now = time.time()
     with IP_LOCK:
         # Keep timestamps from the last 60 seconds
         history = [t for t in IP_RENDER_TIMESTAMPS.get(ip, []) if (now - t) < 60]
-        # Cooldown check: at least 5 seconds between renders from the same device
-        if history and (now - history[-1] < 5):
-            return False, "Mohon tunggu 5 detik sebelum melakukan render lagi."
-        # Quota check: max 4 render requests per minute per IP
-        if len(history) >= 4:
-            return False, "Batas antrean render tercapai (maks. 4 kali per menit). Silakan coba 1 menit lagi."
+        # Cooldown check: 2 seconds between renders
+        if history and (now - history[-1] < 2):
+            return False, "Mohon tunggu 2 detik sebelum melakukan render lagi."
+        # Quota check: max 12 render requests per minute per IP
+        if len(history) >= 12:
+            return False, "Batas antrean render tercapai (maks. 12 kali per menit). Silakan coba 1 menit lagi."
         history.append(now)
         IP_RENDER_TIMESTAMPS[ip] = history
         return True, ""
@@ -124,6 +150,14 @@ def clean_old_temp_files():
 
 cleanup_thread = threading.Thread(target=clean_old_temp_files, daemon=True)
 cleanup_thread.start()
+
+@app.after_request
+def add_security_headers(response):
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "SAMEORIGIN"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
 
 @app.route("/")
 def index():
@@ -165,6 +199,30 @@ def favicon_svg():
     if (DIST_DIR / "favicon.svg").exists():
         return send_from_directory(DIST_DIR, "favicon.svg", mimetype="image/svg+xml")
     return send_from_directory(BASE_DIR / "static", "favicon.svg", mimetype="image/svg+xml")
+
+@app.route("/videos/<path:filename>")
+def serve_videos(filename):
+    if (DIST_DIR / "videos" / filename).exists():
+        return send_from_directory(DIST_DIR / "videos", filename)
+    if (BASE_DIR / "public" / "videos" / filename).exists():
+        return send_from_directory(BASE_DIR / "public" / "videos", filename)
+    return send_from_directory(BASE_DIR / "static" / "videos", filename)
+
+@app.route("/images/<path:filename>")
+def serve_images(filename):
+    if (DIST_DIR / "images" / filename).exists():
+        return send_from_directory(DIST_DIR / "images", filename)
+    if (BASE_DIR / "public" / "images" / filename).exists():
+        return send_from_directory(BASE_DIR / "public" / "images", filename)
+    return send_from_directory(BASE_DIR / "static" / "images", filename)
+
+@app.route("/audio/<path:filename>")
+def serve_audio(filename):
+    if (DIST_DIR / "audio" / filename).exists():
+        return send_from_directory(DIST_DIR / "audio", filename)
+    if (BASE_DIR / "public" / "audio" / filename).exists():
+        return send_from_directory(BASE_DIR / "public" / "audio", filename)
+    return send_from_directory(BASE_DIR / "static" / "audio", filename)
 
 @app.route("/favicon.png")
 def favicon_png():
@@ -413,7 +471,25 @@ def upload_template():
         if res.returncode != 0:
             return jsonify({"status": "error", "message": f"Gagal memproses video: {res.stderr[-300:]}"}), 500
 
-        return jsonify({"status": "success", "message": "Template video berhasil diperbarui!"})
+        # Synchronize template video to dist and public directories
+        for other_video_dir in [DIST_DIR / "videos", BASE_DIR / "public/videos"]:
+            if other_video_dir.exists():
+                try:
+                    shutil.copy2(dest_path, other_video_dir / "template.mp4")
+                except Exception:
+                    pass
+
+        # Extract audio to theme.mp3 for all directories (static, dist, public)
+        for audio_dir in [BASE_DIR / "static/audio", DIST_DIR / "audio", BASE_DIR / "public/audio"]:
+            audio_dir.mkdir(parents=True, exist_ok=True)
+            audio_dest = audio_dir / "theme.mp3"
+            audio_cmd = ["ffmpeg", "-y", "-i", str(dest_path), "-vn", "-c:a", "libmp3lame", "-b:a", "192k", str(audio_dest)]
+            try:
+                subprocess.run(audio_cmd, capture_output=True, timeout=30)
+            except Exception:
+                pass
+
+        return jsonify({"status": "success", "message": "Template video dan audio resmi berhasil diperbarui!"})
     except subprocess.TimeoutExpired:
         if raw_path.exists():
             raw_path.unlink()

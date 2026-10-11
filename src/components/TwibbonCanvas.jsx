@@ -183,25 +183,49 @@ export default function TwibbonCanvas({
     renderComposite();
   }, [updatePhotoCanvas, renderComposite]);
 
-  // Continuous animation loop for video playback
+  // Continuous animation loop for video playback (Listens directly to HTML5 video element)
   useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
     let animId;
     const loop = () => {
-      const video = videoRef.current;
-      if (video && !video.paused && !video.ended) {
+      if (!video.paused && !video.ended) {
         setCurrentTime(video.currentTime);
         renderComposite();
         animId = requestAnimationFrame(loop);
-      } else {
-        setIsPlaying(false);
       }
     };
 
-    if (isPlaying) {
+    const handlePlay = () => {
+      setIsPlaying(true);
+      cancelAnimationFrame(animId);
+      animId = requestAnimationFrame(loop);
+    };
+
+    const handlePauseOrEnd = () => {
+      setIsPlaying(false);
+      cancelAnimationFrame(animId);
+      renderComposite();
+    };
+
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePauseOrEnd);
+    video.addEventListener('ended', handlePauseOrEnd);
+    video.addEventListener('seeked', renderComposite);
+
+    if (!video.paused) {
       animId = requestAnimationFrame(loop);
     }
-    return () => cancelAnimationFrame(animId);
-  }, [isPlaying, videoRef, renderComposite]);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('pause', handlePauseOrEnd);
+      video.removeEventListener('ended', handlePauseOrEnd);
+      video.removeEventListener('seeked', renderComposite);
+    };
+  }, [videoRef, renderComposite]);
 
   // Video loaded metadata
   const handleVideoLoaded = () => {
