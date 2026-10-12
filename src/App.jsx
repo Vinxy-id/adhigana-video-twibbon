@@ -23,6 +23,79 @@ const resolveAssetUrl = (url, fallback = '') => {
   return base.endsWith('/') ? base + clean : base + '/' + clean;
 };
 
+// Patch fragmented MP4 header (mvhd, tkhd, mehd) agar Galeri HP (Apple Photos & Android) membaca durasi (18 detik)
+const fixMp4Duration = async (blob, durationSeconds) => {
+  try {
+    const arrayBuffer = await blob.arrayBuffer();
+    const view = new DataView(arrayBuffer);
+    let mvhdTimescale = 1000;
+
+    const readBox = (start, end) => {
+      let p = start;
+      while (p + 8 <= end) {
+        let size = view.getUint32(p);
+        const type = String.fromCharCode(
+          view.getUint8(p + 4),
+          view.getUint8(p + 5),
+          view.getUint8(p + 6),
+          view.getUint8(p + 7)
+        );
+
+        if (size === 1 && p + 16 <= end) {
+          size = Number(view.getBigUint64(p + 8));
+        } else if (size === 0) {
+          size = end - p;
+        }
+        if (size < 8 || p + size > end) break;
+
+        const contentStart = p + 8;
+        const contentEnd = p + size;
+
+        if (type === 'moov' || type === 'trak' || type === 'mvex') {
+          readBox(contentStart, contentEnd);
+        } else if (type === 'mvhd') {
+          const version = view.getUint8(contentStart);
+          if (version === 0 && contentStart + 20 <= contentEnd) {
+            mvhdTimescale = view.getUint32(contentStart + 12);
+            const dur = Math.round(durationSeconds * mvhdTimescale);
+            view.setUint32(contentStart + 16, dur);
+          } else if (version === 1 && contentStart + 32 <= contentEnd) {
+            mvhdTimescale = view.getUint32(contentStart + 20);
+            const dur = BigInt(Math.round(durationSeconds * mvhdTimescale));
+            view.setBigUint64(contentStart + 24, dur);
+          }
+        } else if (type === 'tkhd') {
+          const version = view.getUint8(contentStart);
+          if (version === 0 && contentStart + 24 <= contentEnd) {
+            const dur = Math.round(durationSeconds * mvhdTimescale);
+            view.setUint32(contentStart + 20, dur);
+          } else if (version === 1 && contentStart + 36 <= contentEnd) {
+            const dur = BigInt(Math.round(durationSeconds * mvhdTimescale));
+            view.setBigUint64(contentStart + 28, dur);
+          }
+        } else if (type === 'mehd') {
+          const version = view.getUint8(contentStart);
+          if (version === 0 && contentStart + 8 <= contentEnd) {
+            const dur = Math.round(durationSeconds * mvhdTimescale);
+            view.setUint32(contentStart + 4, dur);
+          } else if (version === 1 && contentStart + 12 <= contentEnd) {
+            const dur = BigInt(Math.round(durationSeconds * mvhdTimescale));
+            view.setBigUint64(contentStart + 4, dur);
+          }
+        }
+
+        p += size;
+      }
+    };
+
+    readBox(0, arrayBuffer.byteLength);
+    return new Blob([arrayBuffer], { type: 'video/mp4' });
+  } catch (err) {
+    console.warn('Gagal memodifikasi header durasi MP4:', err);
+    return blob;
+  }
+};
+
 export default function App() {
   const [config, setConfig] = useState(defaultConfig);
   const [userImageSrc, setUserImageSrc] = useState(null);
@@ -171,17 +244,13 @@ export default function App() {
     };
   }, [userImageSrc, isRenderOpen, isPhotoDownloading]);
 
-  // 1. DOWNLOAD FOTO STATIS (PNG HD 1080x1080) - 100% INSTAN DI BROWSER
-  const handleDownloadPhoto = () => {
+  // 1. DOWNLOAD FOTO STATIS (PNG HD 1080x1080) - 100% INSTAN & KEBAL BUG IOS WEBKIT
+  const handleDownloadPhoto = async () => {
     if (isPhotoDownloading) return;
     if (!userImageSrc) {
       showToast('Harap pilih foto terlebih dahulu sebelum download!', 'error');
       return;
     }
-
-    const canvas = canvasRef.current;
-    const photoCanvas = photoCanvasRef.current;
-    if (!canvas || !photoCanvas) return;
 
     setIsPhotoDownloading(true);
 
@@ -195,68 +264,80 @@ export default function App() {
       const CIRCLE_Y = config.circle_center_y || 543;
       const CIRCLE_RADIUS = config.circle_radius || 330;
 
-      // 1. Draw photo clipped to circle
+      // 1. Muat gambar foto user langsung (tanpa perantara hidden canvas agar tidak di-purge oleh iOS Safari)
+      const uImg = new Image();
+      if (userImageSrc.startsWith('http://') || userImageSrc.startsWith('https://')) {
+        uImg.crossOrigin = 'anonymous';
+      }
+      uImg.src = userImageSrc;
+      await new Promise((resolve, reject) => {
+        if (uImg.complete && uImg.naturalWidth > 0) return resolve();
+        uImg.onload = resolve;
+        uImg.onerror = () => reject(new Error('Gagal memproses gambar foto'));
+      });
+
+      // 2. Gambar foto user di dalam lingkaran sesuai posisi drag/zoom/rotate
       ctx.save();
       ctx.beginPath();
       ctx.arc(CIRCLE_X, CIRCLE_Y, CIRCLE_RADIUS, 0, Math.PI * 2);
       ctx.closePath();
       ctx.clip();
-      ctx.drawImage(photoCanvas, 0, 0, 1080, 1080);
+      ctx.translate(CIRCLE_X + photoState.x, CIRCLE_Y + photoState.y);
+      ctx.rotate((photoState.rotation * Math.PI) / 180);
+      ctx.scale(photoState.scale, photoState.scale);
+      ctx.drawImage(uImg, -uImg.width / 2, -uImg.height / 2);
       ctx.restore();
 
-      // 2. Draw frame image
+      // 3. Muat dan gambar bingkai twibbon
       const frameImg = new Image();
       frameImg.crossOrigin = 'anonymous';
       frameImg.src = resolveAssetUrl(config.static_frame, 'images/frame.png');
+      await new Promise((resolve, reject) => {
+        if (frameImg.complete && frameImg.naturalWidth > 0) return resolve();
+        frameImg.onload = resolve;
+        frameImg.onerror = () => reject(new Error('Gagal memuat bingkai twibbon'));
+      });
+      ctx.drawImage(frameImg, 0, 0, 1080, 1080);
 
-      frameImg.onload = () => {
-        ctx.drawImage(frameImg, 0, 0, 1080, 1080);
+      // 4. Tambahkan identitas mahasiswa jika diaktifkan
+      if (mabaInfo.showOnTwibbon && mabaInfo.name) {
+        ctx.save();
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 32px "Space Grotesk", sans-serif';
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        ctx.shadowBlur = 8;
+        ctx.shadowOffsetX = 0;
+        ctx.shadowOffsetY = 2;
 
-        // 3. Draw Maba Name & NIM if enabled
-        if (mabaInfo.showOnTwibbon && mabaInfo.name) {
-          ctx.save();
-          ctx.textAlign = 'center';
-          ctx.fillStyle = '#ffffff';
-          ctx.font = 'bold 32px "Space Grotesk", sans-serif';
-          ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-          ctx.shadowBlur = 8;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 2;
+        const textY = 930;
+        ctx.fillText(mabaInfo.name.toUpperCase(), 540, textY);
 
-          const textY = 930;
-          ctx.fillText(mabaInfo.name.toUpperCase(), 540, textY);
-
-          if (mabaInfo.groupOrNim) {
-            ctx.font = '600 22px "Plus Jakarta Sans", sans-serif';
-            ctx.fillStyle = '#f87171';
-            ctx.fillText(mabaInfo.groupOrNim, 540, textY + 36);
-          }
-          ctx.restore();
+        if (mabaInfo.groupOrNim) {
+          ctx.font = '600 22px "Plus Jakarta Sans", sans-serif';
+          ctx.fillStyle = '#f87171';
+          ctx.fillText(mabaInfo.groupOrNim, 540, textY + 36);
         }
-
-        // Export to PNG blob
-        exportCanvas.toBlob((blob) => {
-          setIsPhotoDownloading(false);
-          if (!blob) return;
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          const cleanTitle = (config.campaign_title || 'Twibbon').replace(/\s+/g, '_');
-          a.download = `Twibbon_${cleanTitle}.png`;
-          a.href = url;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(() => URL.revokeObjectURL(url), 10000);
-
-          triggerCelebration();
-          showToast('Foto Twibbon berhasil didownload!');
-        }, 'image/png');
-      };
-
-      // Fallback if frame already cached
-      if (frameImg.complete && frameImg.naturalWidth > 0) {
-        frameImg.onload();
+        ctx.restore();
       }
+
+      // 5. Ekspor Blob PNG
+      const blob = await new Promise((resolve) => exportCanvas.toBlob(resolve, 'image/png'));
+      if (!blob) throw new Error('Gagal menghasilkan file gambar PNG');
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const cleanTitle = (config.campaign_title || 'Twibbon').replace(/\s+/g, '_');
+      a.download = `Twibbon_${cleanTitle}.png`;
+      a.href = url;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+
+      setIsPhotoDownloading(false);
+      triggerCelebration();
+      showToast('Foto Twibbon berhasil didownload!');
     } catch (err) {
       setIsPhotoDownloading(false);
       console.error(err);
@@ -274,8 +355,7 @@ export default function App() {
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
-    const photoCanvas = photoCanvasRef.current;
-    if (!photoCanvas) return;
+    if (!canvas) return;
 
     setIsRenderOpen(true);
     setRenderProgress(10);
@@ -284,12 +364,76 @@ export default function App() {
     // A. METODE UTAMA: Render via Server FFmpeg (MP4 Asli H.264 + AAC + FastStart untuk Galeri HP)
     let serverSuccess = false;
     try {
-      setRenderProgress(20);
-      setRenderStatus('Menghubungkan ke pemroses video server...');
+      setRenderProgress(18);
+      setRenderStatus('Memproses komposisi foto HD...');
 
-      const photoBlob = await new Promise((resolve) => photoCanvas.toBlob(resolve, 'image/png'));
+      // Buat canvas foto 1080x1080 mandiri di memori (kebal terhadap memory purge WebKit iOS)
+      const pCanvas = document.createElement('canvas');
+      pCanvas.width = 1080;
+      pCanvas.height = 1080;
+      const pCtx = pCanvas.getContext('2d');
+      pCtx.fillStyle = '#000000';
+      pCtx.fillRect(0, 0, 1080, 1080);
+
+      const uImg = new Image();
+      if (userImageSrc.startsWith('http://') || userImageSrc.startsWith('https://')) {
+        uImg.crossOrigin = 'anonymous';
+      }
+      uImg.src = userImageSrc;
+      await new Promise((resolve, reject) => {
+        if (uImg.complete && uImg.naturalWidth > 0) return resolve();
+        uImg.onload = resolve;
+        uImg.onerror = reject;
+      });
+
+      const CIRCLE_X = config.circle_center_x || 536;
+      const CIRCLE_Y = config.circle_center_y || 543;
+
+      pCtx.save();
+      pCtx.translate(CIRCLE_X + photoState.x, CIRCLE_Y + photoState.y);
+      pCtx.rotate((photoState.rotation * Math.PI) / 180);
+      pCtx.scale(photoState.scale, photoState.scale);
+      pCtx.drawImage(uImg, -uImg.width / 2, -uImg.height / 2);
+      pCtx.restore();
+
+      // Tambahkan nama mahasiswa jika ada
+      if (mabaInfo.showOnTwibbon && mabaInfo.name) {
+        pCtx.save();
+        pCtx.textAlign = 'center';
+        pCtx.fillStyle = '#ffffff';
+        pCtx.font = 'bold 32px "Space Grotesk", sans-serif';
+        pCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        pCtx.shadowBlur = 8;
+        pCtx.shadowOffsetX = 0;
+        pCtx.shadowOffsetY = 2;
+
+        const textY = 930;
+        pCtx.fillText(mabaInfo.name.toUpperCase(), 540, textY);
+
+        if (mabaInfo.groupOrNim) {
+          pCtx.font = '600 22px "Plus Jakarta Sans", sans-serif';
+          pCtx.fillStyle = '#f87171';
+          pCtx.fillText(mabaInfo.groupOrNim, 540, textY + 36);
+        }
+        pCtx.restore();
+      }
+
+      const photoDataUrl = pCanvas.toDataURL('image/png');
+      let photoBlob = null;
+      try {
+        photoBlob = await new Promise((resolve) => pCanvas.toBlob(resolve, 'image/png'));
+      } catch (_) {}
+
       const formData = new FormData();
-      formData.append('photo', photoBlob, 'photo.png');
+      if (photoBlob) {
+        formData.append('photo', photoBlob, 'photo.png');
+      }
+      if (photoDataUrl) {
+        formData.append('photo_base64', photoDataUrl);
+      }
+
+      setRenderProgress(25);
+      setRenderStatus('Menghubungkan ke pemroses video server...');
 
       let p = 25;
       const timer = setInterval(() => {
@@ -474,7 +618,7 @@ export default function App() {
         setTimeout(() => {
           setIsRenderOpen(false);
           triggerCelebration();
-          showToast(`Video Twibbon berhasil didownload (${ext.toUpperCase()})!`);
+          showToast(`Video Twibbon berhasil didownload (${ext.toUpperCase()})! Durasi pas 18 detik.`);
         }, 500);
       };
 
@@ -484,10 +628,20 @@ export default function App() {
           combinedStream.getTracks().forEach((t) => t.stop());
         } catch (_) {}
 
-        const isWebm = (selectedMime && selectedMime.includes('webm')) || (!selectedMime.includes('mp4'));
-        const rawBlob = new Blob(recordedChunks, { type: selectedMime || (isWebm ? 'video/webm' : 'video/mp4') });
+        const isMp4 = (selectedMime && selectedMime.includes('mp4')) || (!selectedMime.includes('webm'));
+        const rawBlob = new Blob(recordedChunks, { type: selectedMime || (isMp4 ? 'video/mp4' : 'video/webm') });
 
-        if (isWebm) {
+        if (isMp4) {
+          setRenderStatus('Menyempurnakan durasi video MP4 (18 detik)...');
+          setRenderProgress(96);
+          try {
+            const fixedBlob = await fixMp4Duration(rawBlob, totalDuration);
+            downloadFinishedBlob(fixedBlob, 'mp4');
+          } catch (fixErr) {
+            console.warn('Gagal patch durasi MP4, unduh file asli:', fixErr);
+            downloadFinishedBlob(rawBlob, 'mp4');
+          }
+        } else {
           setRenderStatus('Menyempurnakan durasi video (18 detik)...');
           setRenderProgress(96);
           try {
@@ -503,8 +657,6 @@ export default function App() {
             console.warn('fixWebmDuration error, fallback to raw blob:', fixErr);
             downloadFinishedBlob(rawBlob, 'webm');
           }
-        } else {
-          downloadFinishedBlob(rawBlob, 'mp4');
         }
 
         if (audioContext && audioContext.state !== 'closed') {

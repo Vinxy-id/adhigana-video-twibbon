@@ -74,7 +74,9 @@ export default function TwibbonCanvas({
       return;
     }
     const img = new Image();
-    img.crossOrigin = 'anonymous';
+    if (userImageSrc.startsWith('http://') || userImageSrc.startsWith('https://')) {
+      img.crossOrigin = 'anonymous';
+    }
     img.src = userImageSrc;
     img.onload = () => {
       setUserImg(img);
@@ -122,14 +124,17 @@ export default function TwibbonCanvas({
 
     // Mode 1: Static Twibbon / Main Twibbon Frame (Time >= 9.5s or no video)
     if (!video || curTime >= 9.5) {
-      // 1. Draw user photo clipped to circle
+      // 1. Draw user photo clipped to circle directly (prevents iOS Safari blank canvas bug)
       if (userImg) {
         ctx.save();
         ctx.beginPath();
         ctx.arc(CIRCLE_X, CIRCLE_Y, CIRCLE_RADIUS, 0, Math.PI * 2);
         ctx.closePath();
         ctx.clip();
-        ctx.drawImage(pCanvas, 0, 0, 1080, 1080);
+        ctx.translate(CIRCLE_X + photoState.x, CIRCLE_Y + photoState.y);
+        ctx.rotate((photoState.rotation * Math.PI) / 180);
+        ctx.scale(photoState.scale, photoState.scale);
+        ctx.drawImage(userImg, -userImg.width / 2, -userImg.height / 2);
         ctx.restore();
       }
 
@@ -185,7 +190,7 @@ export default function TwibbonCanvas({
         ctx.drawImage(video, 0, 0, 1080, 1080);
       }
     }
-  }, [canvasRef, videoRef, photoCanvasRef, userImg, staticFrameImg, maskImg, CIRCLE_X, CIRCLE_Y, CIRCLE_RADIUS, mabaInfo]);
+  }, [canvasRef, videoRef, userImg, staticFrameImg, maskImg, CIRCLE_X, CIRCLE_Y, CIRCLE_RADIUS, photoState, mabaInfo]);
 
   // Re-render when photoState or userImg changes
   useEffect(() => {
@@ -392,18 +397,40 @@ export default function TwibbonCanvas({
 
   return (
     <div className="w-full flex flex-col items-center">
-      {/* Hidden elements */}
+      {/* Off-screen elements (avoid display:none so WebKit/Safari does not purge GPU backing store or video frames) */}
       <video
         ref={videoRef}
         src={resolveAssetUrl(config.template_video, 'videos/template.mp4')}
         playsInline
+        webkit-playsinline="true"
         muted={isMuted}
         crossOrigin="anonymous"
         onLoadedMetadata={handleVideoLoaded}
         onEnded={() => setIsPlaying(false)}
-        className="hidden"
+        style={{
+          position: 'fixed',
+          top: '-9999px',
+          left: '-9999px',
+          width: '1px',
+          height: '1px',
+          opacity: 0,
+          pointerEvents: 'none',
+        }}
       />
-      <canvas ref={photoCanvasRef} width={1080} height={1080} className="hidden" />
+      <canvas
+        ref={photoCanvasRef}
+        width={1080}
+        height={1080}
+        style={{
+          position: 'fixed',
+          top: '-9999px',
+          left: '-9999px',
+          width: '1px',
+          height: '1px',
+          opacity: 0,
+          pointerEvents: 'none',
+        }}
+      />
 
       {/* Main Preview Container */}
       <div

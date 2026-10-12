@@ -355,16 +355,26 @@ def render_video():
         user_photo_path = TEMP_DIR / f"user_{job_id}.png"
         output_video_path = TEMP_DIR / f"twibbon_{job_id}.mp4"
 
+        saved = False
         if "photo" in request.files:
             file = request.files["photo"]
-            file.save(user_photo_path)
-        else:
+            if file and file.filename != "":
+                file.save(user_photo_path)
+                if user_photo_path.exists() and user_photo_path.stat().st_size > 0:
+                    saved = True
+
+        if not saved and "photo_base64" in request.form and request.form["photo_base64"].strip():
             import base64
-            b64_data = request.form["photo_base64"]
+            b64_data = request.form["photo_base64"].strip()
             if "," in b64_data:
                 b64_data = b64_data.split(",")[1]
             with open(user_photo_path, "wb") as f:
                 f.write(base64.b64decode(b64_data))
+            if user_photo_path.exists() and user_photo_path.stat().st_size > 0:
+                saved = True
+
+        if not saved:
+            return jsonify({"status": "error", "message": "Foto tidak ditemukan atau kosong dalam request"}), 400
 
         # SECURITY: Validate image using Pillow (prevent decompression bombs, corrupted/polyglot files)
         try:
