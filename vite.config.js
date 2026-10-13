@@ -10,10 +10,15 @@ function versionPlugin() {
     name: 'version-generator',
     closeBundle() {
       const distDir = path.resolve(__dirname, 'dist')
+      const configPath = path.resolve(__dirname, 'src/config.json')
+      let cfg = {}
+      if (fs.existsSync(configPath)) {
+        try { cfg = JSON.parse(fs.readFileSync(configPath, 'utf8')) } catch (_) {}
+      }
       if (fs.existsSync(distDir)) {
         fs.writeFileSync(
           path.join(distDir, 'version.json'),
-          JSON.stringify({ buildTime }, null, 2)
+          JSON.stringify({ buildTime, config: cfg }, null, 2)
         )
       }
     }

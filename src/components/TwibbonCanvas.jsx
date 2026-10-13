@@ -139,7 +139,8 @@ export default function TwibbonCanvas({
       }
 
       // 2. Draw live animated video with transparent circular twibbon hole (or static frame fallback)
-      if (video && video.readyState >= 2) {
+      const isVideoActive = video && video.readyState >= 2 && !video.paused;
+      if (isVideoActive) {
         const vCanvas = videoOffscreenRef.current;
         const vCtx = vCanvas.getContext('2d');
         vCtx.clearRect(0, 0, 1080, 1080);
@@ -160,7 +161,25 @@ export default function TwibbonCanvas({
         // Draw animated video frame overlay on top of photo
         ctx.drawImage(vCanvas, 0, 0, 1080, 1080);
       } else if (staticFrameImg && staticFrameImg.complete) {
+        // JALUR CEPAT (ECO/LITE): Saat video paused/diam, langsung render frame statis yang di-cache!
+        // Menghilangkan alokasi offscreen canvas dan masking loop di GPU perangkat hemat daya/kentang
         ctx.drawImage(staticFrameImg, 0, 0, 1080, 1080);
+      } else if (video && video.readyState >= 2) {
+        const vCanvas = videoOffscreenRef.current;
+        const vCtx = vCanvas.getContext('2d');
+        vCtx.clearRect(0, 0, 1080, 1080);
+        vCtx.drawImage(video, 0, 0, 1080, 1080);
+        vCtx.save();
+        vCtx.globalCompositeOperation = 'destination-out';
+        if (maskImg && maskImg.complete && maskImg.naturalWidth > 0) {
+          vCtx.drawImage(maskImg, 0, 0, 1080, 1080);
+        } else {
+          vCtx.beginPath();
+          vCtx.arc(CIRCLE_X, CIRCLE_Y, CIRCLE_RADIUS - 3, 0, Math.PI * 2);
+          vCtx.fill();
+        }
+        vCtx.restore();
+        ctx.drawImage(vCanvas, 0, 0, 1080, 1080);
       }
 
       // 3. Stamp Maba Name & NIM if enabled
@@ -297,6 +316,22 @@ export default function TwibbonCanvas({
   };
 
   // TOUCH & MOUSE GESTURES FOR MOBILE PINCH-TO-ZOOM & PAN
+  const commitPhotoStateUpdate = (updater) => {
+    if (dragRef.current.rafScheduled) {
+      dragRef.current.pendingUpdater = updater;
+      return;
+    }
+    dragRef.current.rafScheduled = true;
+    dragRef.current.pendingUpdater = updater;
+    requestAnimationFrame(() => {
+      dragRef.current.rafScheduled = false;
+      if (dragRef.current.pendingUpdater) {
+        setPhotoState(dragRef.current.pendingUpdater);
+        dragRef.current.pendingUpdater = null;
+      }
+    });
+  };
+
   const handleMouseDown = (e) => {
     if (!userImg) return;
     dragRef.current.isDragging = true;
@@ -316,7 +351,7 @@ export default function TwibbonCanvas({
     const dx = (e.clientX - dragRef.current.startX) * scaleFactor;
     const dy = (e.clientY - dragRef.current.startY) * scaleFactor;
 
-    setPhotoState((prev) => ({
+    commitPhotoStateUpdate((prev) => ({
       ...prev,
       x: dragRef.current.initialPhotoX + dx,
       y: dragRef.current.initialPhotoY + dy,
@@ -325,13 +360,17 @@ export default function TwibbonCanvas({
 
   const handleMouseUp = () => {
     dragRef.current.isDragging = false;
+    if (dragRef.current.pendingUpdater) {
+      setPhotoState(dragRef.current.pendingUpdater);
+      dragRef.current.pendingUpdater = null;
+    }
   };
 
   const handleWheel = (e) => {
     if (!userImg) return;
     e.preventDefault();
     const zoomFactor = e.deltaY < 0 ? 1.05 : 0.95;
-    setPhotoState((prev) => ({
+    commitPhotoStateUpdate((prev) => ({
       ...prev,
       scale: Math.max(0.1, Math.min(prev.scale * zoomFactor, prev.baseScale * 4)),
     }));
@@ -366,7 +405,7 @@ export default function TwibbonCanvas({
     if (e.touches.length === 1 && dragRef.current.isDragging) {
       const dx = (e.touches[0].clientX - dragRef.current.startX) * scaleFactor;
       const dy = (e.touches[0].clientY - dragRef.current.startY) * scaleFactor;
-      setPhotoState((prev) => ({
+      commitPhotoStateUpdate((prev) => ({
         ...prev,
         x: dragRef.current.initialPhotoX + dx,
         y: dragRef.current.initialPhotoY + dy,
@@ -377,7 +416,7 @@ export default function TwibbonCanvas({
       const currentDistance = Math.hypot(dx, dy);
       const ratio = currentDistance / dragRef.current.initialPinchDistance;
 
-      setPhotoState((prev) => ({
+      commitPhotoStateUpdate((prev) => ({
         ...prev,
         scale: Math.max(0.1, Math.min(dragRef.current.initialScale * ratio, prev.baseScale * 4)),
       }));
@@ -387,6 +426,10 @@ export default function TwibbonCanvas({
   const handleTouchEnd = () => {
     dragRef.current.isDragging = false;
     dragRef.current.initialPinchDistance = 0;
+    if (dragRef.current.pendingUpdater) {
+      setPhotoState(dragRef.current.pendingUpdater);
+      dragRef.current.pendingUpdater = null;
+    }
   };
 
   const formatTime = (secs) => {

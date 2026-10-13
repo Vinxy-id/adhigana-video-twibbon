@@ -13,9 +13,11 @@ import {
   Copy,
   Check,
   User,
+  ExternalLink,
 } from 'lucide-react';
 
 export default function ControlPanel({
+  config,
   photoState,
   setPhotoState,
   onFileSelect,
@@ -269,6 +271,20 @@ export default function ControlPanel({
           <Copy className="w-4 h-4 text-purple-400 shrink-0" />
           <span>Salin Caption Instagram Resmi</span>
         </button>
+
+        {/* Link Twibbon Alternatif (Twibbonize) */}
+        {config?.twibbonize_url && (
+          <a
+            href={config.twibbonize_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full py-2.5 px-3 sm:px-4 rounded-xl bg-[#13151e] hover:bg-[#1a1d29] text-gray-300 hover:text-white border border-[#2b3040] hover:border-gray-600 font-medium text-xs sm:text-[13px] flex items-center justify-center gap-2 transition active:scale-98"
+            title="Buka link alternatif di Twibbonize"
+          >
+            <ExternalLink className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+            <span>Link Twibbon Alternatif (twb.nz/adhigana26)</span>
+          </a>
+        )}
       </div>
     </div>
   );

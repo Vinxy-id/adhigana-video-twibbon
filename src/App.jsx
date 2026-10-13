@@ -96,6 +96,52 @@ const fixMp4Duration = async (blob, durationSeconds) => {
   }
 };
 
+// Simpan file langsung ke Galeri (via Web Share di iOS dengan tombol 'Simpan Gambar/Video', atau download otomatis di Android/Desktop)
+const saveOrDownloadFile = async (blob, filename, mimeType, isPhoto = true) => {
+  const isIOS = () => {
+    if (typeof navigator === 'undefined') return false;
+    return (
+      /iPad|iPhone|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+    );
+  };
+
+  const triggerAnchorDownload = () => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.download = filename;
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  };
+
+  // Khusus perangkat iOS (iPhone / iPad), Web Share API menampilkan lembar aksi asli iOS
+  // yang memiliki tombol "Simpan Gambar" / "Simpan Video" untuk langsung masuk ke Galeri Foto (Rol Kamera)
+  if (isIOS() && typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
+    try {
+      const file = new File([blob], filename, { type: mimeType || blob.type });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: 'Twibbon Adhigana Informatika 2026',
+        });
+        return true;
+      }
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        return false;
+      }
+      console.warn('Web Share API error, beralih ke unduhan biasa:', err);
+    }
+  }
+
+  // Fallback standar (Di Android & Desktop langsung otomatis terunduh dan terbaca di Galeri)
+  triggerAnchorDownload();
+  return true;
+};
+
 export default function App() {
   const [config, setConfig] = useState(defaultConfig);
   const [userImageSrc, setUserImageSrc] = useState(null);
@@ -147,8 +193,58 @@ export default function App() {
     });
   };
 
+  // Optimasi otomatis untuk perangkat hemat daya/kentang (cegah OOM crash saat upload kamera 48MP-108MP)
+  const optimizeImageFile = (file) => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const rawDataUrl = e.target.result;
+        const img = new Image();
+        img.onload = () => {
+          const MAX_DIM = 1440; // Resolusi optimal tajam di kanvas 1080p, hemat RAM 95%
+          let { width, height } = img;
+          if (width <= MAX_DIM && height <= MAX_DIM && file.size < 1.5 * 1024 * 1024) {
+            return resolve(rawDataUrl);
+          }
+
+          if (width > height) {
+            if (width > MAX_DIM) {
+              height = Math.round((height * MAX_DIM) / width);
+              width = MAX_DIM;
+            }
+          } else {
+            if (height > MAX_DIM) {
+              width = Math.round((width * MAX_DIM) / height);
+              height = MAX_DIM;
+            }
+          }
+
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.imageSmoothingEnabled = true;
+            ctx.imageSmoothingQuality = 'high';
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const isPng = file.type === 'image/png';
+            const optimized = canvas.toDataURL(isPng ? 'image/png' : 'image/jpeg', 0.90);
+            resolve(optimized);
+          } catch (_) {
+            resolve(rawDataUrl);
+          }
+        };
+        img.onerror = () => resolve(rawDataUrl);
+        img.src = rawDataUrl;
+      };
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+  };
+
   // Handle Photo File Upload
-  const handleFileSelect = (e) => {
+  const handleFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -157,12 +253,17 @@ export default function App() {
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setUserImageSrc(event.target.result);
-      showToast('Foto berhasil dimuat! Silakan atur posisi agar pas.');
-    };
-    reader.readAsDataURL(file);
+    try {
+      const optimizedUrl = await optimizeImageFile(file);
+      if (optimizedUrl) {
+        setUserImageSrc(optimizedUrl);
+        showToast('Foto berhasil dimuat! Silakan atur posisi agar pas.');
+      } else {
+        showToast('Gagal memuat file gambar.', 'error');
+      }
+    } catch (_) {
+      showToast('Gagal memproses gambar.', 'error');
+    }
     e.target.value = '';
   };
 
@@ -183,7 +284,7 @@ export default function App() {
       isChecking = true;
 
       try {
-        const versionUrl = resolveAssetUrl('/api/version', 'version.json');
+        const versionUrl = resolveAssetUrl('version.json');
         const res = await fetch(`${versionUrl}?_t=${Date.now()}`, {
           cache: 'no-store',
           headers: {
@@ -321,23 +422,17 @@ export default function App() {
         ctx.restore();
       }
 
-      // 5. Ekspor Blob PNG
+      // 5. Ekspor Blob PNG & Simpan ke Galeri / Download
       const blob = await new Promise((resolve) => exportCanvas.toBlob(resolve, 'image/png'));
       if (!blob) throw new Error('Gagal menghasilkan file gambar PNG');
 
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
       const cleanTitle = (config.campaign_title || 'Twibbon').replace(/\s+/g, '_');
-      a.download = `Twibbon_${cleanTitle}.png`;
-      a.href = url;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 10000);
+      const filename = `Twibbon_${cleanTitle}.png`;
+      await saveOrDownloadFile(blob, filename, 'image/png', true);
 
       setIsPhotoDownloading(false);
       triggerCelebration();
-      showToast('Foto Twibbon berhasil didownload!');
+      showToast('Foto Twibbon berhasil diproses! Tersimpan di Galeri / Unduhan.');
     } catch (err) {
       setIsPhotoDownloading(false);
       console.error(err);
@@ -345,7 +440,7 @@ export default function App() {
     }
   };
 
-  // 2. DOWNLOAD VIDEO (SERVER MP4 HD UTAMA DENGAN FALLBACK PEREKAMAN BROWSER)
+  // 2. DOWNLOAD VIDEO (100% PURE CLIENT-SIDE / SERVERLESS / STATIC WEB)
   const handleDownloadVideo = async () => {
     if (isRenderOpen) return; // Prevent double-click race conditions
     if (!userImageSrc) {
@@ -359,140 +454,9 @@ export default function App() {
 
     setIsRenderOpen(true);
     setRenderProgress(10);
-    setRenderStatus('Menyiapkan pemrosesan video MP4 HD...');
+    setRenderStatus('Menyiapkan pemrosesan video...');
 
-    // A. METODE UTAMA: Render via Server FFmpeg (MP4 Asli H.264 + AAC + FastStart untuk Galeri HP)
-    let serverSuccess = false;
-    try {
-      setRenderProgress(18);
-      setRenderStatus('Memproses komposisi foto HD...');
-
-      // Buat canvas foto 1080x1080 mandiri di memori (kebal terhadap memory purge WebKit iOS)
-      const pCanvas = document.createElement('canvas');
-      pCanvas.width = 1080;
-      pCanvas.height = 1080;
-      const pCtx = pCanvas.getContext('2d');
-      pCtx.fillStyle = '#000000';
-      pCtx.fillRect(0, 0, 1080, 1080);
-
-      const uImg = new Image();
-      if (userImageSrc.startsWith('http://') || userImageSrc.startsWith('https://')) {
-        uImg.crossOrigin = 'anonymous';
-      }
-      uImg.src = userImageSrc;
-      await new Promise((resolve, reject) => {
-        if (uImg.complete && uImg.naturalWidth > 0) return resolve();
-        uImg.onload = resolve;
-        uImg.onerror = reject;
-      });
-
-      const CIRCLE_X = config.circle_center_x || 536;
-      const CIRCLE_Y = config.circle_center_y || 543;
-
-      pCtx.save();
-      pCtx.translate(CIRCLE_X + photoState.x, CIRCLE_Y + photoState.y);
-      pCtx.rotate((photoState.rotation * Math.PI) / 180);
-      pCtx.scale(photoState.scale, photoState.scale);
-      pCtx.drawImage(uImg, -uImg.width / 2, -uImg.height / 2);
-      pCtx.restore();
-
-      // Tambahkan nama mahasiswa jika ada
-      if (mabaInfo.showOnTwibbon && mabaInfo.name) {
-        pCtx.save();
-        pCtx.textAlign = 'center';
-        pCtx.fillStyle = '#ffffff';
-        pCtx.font = 'bold 32px "Space Grotesk", sans-serif';
-        pCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-        pCtx.shadowBlur = 8;
-        pCtx.shadowOffsetX = 0;
-        pCtx.shadowOffsetY = 2;
-
-        const textY = 930;
-        pCtx.fillText(mabaInfo.name.toUpperCase(), 540, textY);
-
-        if (mabaInfo.groupOrNim) {
-          pCtx.font = '600 22px "Plus Jakarta Sans", sans-serif';
-          pCtx.fillStyle = '#f87171';
-          pCtx.fillText(mabaInfo.groupOrNim, 540, textY + 36);
-        }
-        pCtx.restore();
-      }
-
-      const photoDataUrl = pCanvas.toDataURL('image/png');
-      let photoBlob = null;
-      try {
-        photoBlob = await new Promise((resolve) => pCanvas.toBlob(resolve, 'image/png'));
-      } catch (_) {}
-
-      const formData = new FormData();
-      if (photoBlob) {
-        formData.append('photo', photoBlob, 'photo.png');
-      }
-      if (photoDataUrl) {
-        formData.append('photo_base64', photoDataUrl);
-      }
-
-      setRenderProgress(25);
-      setRenderStatus('Menghubungkan ke pemroses video server...');
-
-      let p = 25;
-      const timer = setInterval(() => {
-        if (p < 88) {
-          p += 6;
-          setRenderProgress(p);
-          if (p > 50) {
-            setRenderStatus('Merender video MP4 1080p dengan FastStart...');
-          }
-        }
-      }, 350);
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 35000);
-
-      const res = await fetch('/api/render-video', {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-      clearInterval(timer);
-
-      if (res.ok) {
-        setRenderProgress(96);
-        setRenderStatus('Menyempurnakan durasi (FastStart untuk Galeri HP)...');
-
-        const vBlob = await res.blob();
-        const url = URL.createObjectURL(vBlob);
-        const a = document.createElement('a');
-        const cleanTitle = (config.campaign_title || 'Twibbon').replace(/\s+/g, '_');
-        a.download = `Video_Twibbon_${cleanTitle}.mp4`;
-        a.href = url;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
-
-        setRenderProgress(100);
-        setRenderStatus('Selesai! Video MP4 berhasil diunduh.');
-
-        setTimeout(() => {
-          setIsRenderOpen(false);
-          triggerCelebration();
-          showToast('Video Twibbon MP4 berhasil diunduh! Durasi pas 18 detik & siap putar di Galeri/WhatsApp.');
-        }, 500);
-        serverSuccess = true;
-        return;
-      } else {
-        console.warn('Server render returned status:', res.status, '- beralih ke perekaman browser...');
-      }
-    } catch (serverErr) {
-      console.warn('Server FFmpeg tidak terjangkau / offline, beralih ke render browser:', serverErr);
-    }
-
-    if (serverSuccess) return;
-
-    // B. METODE FALLBACK: Perekaman di browser HP/Client jika server offline / statis
+    // Perekaman langsung di browser perangkat (Serverless, aman saat laptop mati)
     await handleClientRecording(video, canvas);
   };
 
@@ -583,11 +547,16 @@ export default function App() {
       }
       const combinedStream = new MediaStream(combinedTracks);
 
-      // 4. Setup MediaRecorder
+      // 4. Setup MediaRecorder (Adaptif terhadap spesifikasi perangkat)
+      const isLowEndDevice = typeof navigator !== 'undefined' && (
+        (navigator.hardwareConcurrency && navigator.hardwareConcurrency <= 4) ||
+        (navigator.deviceMemory && navigator.deviceMemory <= 4)
+      );
+
       const recorderOptions = {};
       if (selectedMime) recorderOptions.mimeType = selectedMime;
-      recorderOptions.videoBitsPerSecond = 8000000;
-      if (audioTrack) recorderOptions.audioBitsPerSecond = 192000;
+      recorderOptions.videoBitsPerSecond = isLowEndDevice ? 3500000 : 8000000;
+      if (audioTrack) recorderOptions.audioBitsPerSecond = isLowEndDevice ? 128000 : 192000;
 
       const recorder = new MediaRecorder(combinedStream, recorderOptions);
       const recordedChunks = [];
@@ -601,16 +570,11 @@ export default function App() {
       const totalDuration = video.duration && !isNaN(video.duration) && video.duration > 0 ? video.duration : 17.97;
       const durationMs = Math.round(totalDuration * 1000);
 
-      const downloadFinishedBlob = (finalBlob, ext) => {
-        const url = URL.createObjectURL(finalBlob);
-        const a = document.createElement('a');
+      const downloadFinishedBlob = async (finalBlob, ext) => {
         const cleanTitle = (config.campaign_title || 'Twibbon').replace(/\s+/g, '_');
-        a.download = `Video_Twibbon_${cleanTitle}.${ext}`;
-        a.href = url;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 10000);
+        const filename = `Video_Twibbon_${cleanTitle}.${ext}`;
+        const mimeType = ext === 'mp4' ? 'video/mp4' : 'video/webm';
+        await saveOrDownloadFile(finalBlob, filename, mimeType, false);
 
         setRenderProgress(100);
         setRenderStatus('Selesai! Video berhasil diunduh.');
@@ -636,10 +600,10 @@ export default function App() {
           setRenderProgress(96);
           try {
             const fixedBlob = await fixMp4Duration(rawBlob, totalDuration);
-            downloadFinishedBlob(fixedBlob, 'mp4');
+            await downloadFinishedBlob(fixedBlob, 'mp4');
           } catch (fixErr) {
             console.warn('Gagal patch durasi MP4, unduh file asli:', fixErr);
-            downloadFinishedBlob(rawBlob, 'mp4');
+            await downloadFinishedBlob(rawBlob, 'mp4');
           }
         } else {
           setRenderStatus('Menyempurnakan durasi video (18 detik)...');
@@ -652,10 +616,10 @@ export default function App() {
                 reject(e);
               }
             });
-            downloadFinishedBlob(fixedBlob, 'webm');
+            await downloadFinishedBlob(fixedBlob, 'webm');
           } catch (fixErr) {
             console.warn('fixWebmDuration error, fallback to raw blob:', fixErr);
-            downloadFinishedBlob(rawBlob, 'webm');
+            await downloadFinishedBlob(rawBlob, 'webm');
           }
         }
 
@@ -742,8 +706,13 @@ export default function App() {
   // 3. SALIN CAPTION INSTAGRAM
   const handleCopyCaption = () => {
     let caption = config.caption_template || '';
-    const studentName = mabaInfo.name.trim() || '[Isi Nama Kamu]';
-    caption = caption.replace('[Isi Nama Kamu]', studentName);
+    const studentName = mabaInfo.name.trim();
+    if (studentName) {
+      caption = caption
+        .replace('(Nama Lengkap)', studentName)
+        .replace('[Nama Lengkap]', studentName)
+        .replace('[Isi Nama Kamu]', studentName);
+    }
 
     navigator.clipboard
       .writeText(caption)
@@ -818,6 +787,7 @@ export default function App() {
           {/* Right Column: Controls, Sliders, & Action Buttons */}
           <div className="lg:col-span-6 w-full flex justify-center">
             <ControlPanel
+              config={config}
               photoState={photoState}
               setPhotoState={setPhotoState}
               onFileSelect={handleFileSelect}
@@ -842,6 +812,7 @@ export default function App() {
 
       {/* Modals */}
       <ShareModal
+        config={config}
         isOpen={isShareOpen}
         onClose={() => setIsShareOpen(false)}
         onCopyLink={() => showToast('Tautan berhasil disalin!')}

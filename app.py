@@ -45,13 +45,13 @@ def load_config():
         "campaign_subtitle": "Fakultas Sains dan Teknologi",
         "campaign_tagline": "Are You Ready? Better Things Ahead :)",
         "description": "Upload foto dan download Video Twibbon kamu secara instan tanpa ribet!",
-        "caption_template": "[ARE YOU READY FOR ADHIGANA INFORMATIKA 2026?]\n\n#Adhigana2026 #Informatika",
+        "caption_template": "Halo ! Saya (Nama Lengkap) Mahasiswa Baru Program\nStudi Informatika Universitas Bhinneka PGRI\nSiap ! Mengikuti kegiatan ADHIGANA INFORMATIKA 2026\nSOLID SOLID SOLID LUAR BIASA\n\n(Motto)\n\n(Mention Instagram kakak\nIP)\n\nInstagram : \n@ubhiofficial_account,\n@fst.ubhi,\n@informatikaubhi,\n@himatika.ubhi\n\n#UBHI #informatikaUBHI #AdhiganaInformatika2026 #INFDAY\n\nDi kolom komentar :\n#GWC_26 #IKILOPRODINE #OSJURINF #Solidarity#Tulungagung #JawaTimur\n(Mention Instagram teman 1 Kelompok )\n\nLalu jangan lupa di bagian foto kalian tag juga ya agar masuk  postingan kalian ke Minfor :\n@ubhiofficial_account,\n@fst.ubhi,\n@informatikaubhi,\n@himatika.ubhi\n@kakaIPkalian",
         "template_video": "static/videos/template.mp4",
         "static_frame": "static/images/frame.png",
         "circle_center_x": 536,
         "circle_center_y": 543,
         "circle_radius": 330,
-        "twibbonize_url": "https://www.twibbonize.com",
+        "twibbonize_url": "https://twb.nz/adhigana26",
         "admin_pin": "adhigana2026"
     }
 

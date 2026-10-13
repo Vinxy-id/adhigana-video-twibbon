@@ -255,7 +255,7 @@
                 <span>Download Foto</span>
               </button>
               
-              <a id="btnOpenTwibbonize" href="{{ config.twibbonize_url or 'https://www.twibbonize.com' }}" target="_blank" rel="noopener noreferrer" class="py-2.5 px-2 rounded-xl bg-[#1f2330] hover:bg-[#2a3042] text-gray-200 font-semibold text-xs flex items-center justify-center gap-1.5 border border-gray-700/60 transition" title="Buka Twibbonize resmi">
+              <a id="btnOpenTwibbonize" href="{{ config.twibbonize_url or 'https://twb.nz/adhigana26' }}" target="_blank" rel="noopener noreferrer" class="py-2.5 px-2 rounded-xl bg-[#1f2330] hover:bg-[#2a3042] text-gray-200 font-semibold text-xs flex items-center justify-center gap-1.5 border border-gray-700/60 transition" title="Buka Twibbonize resmi">
                 <i class="fa-solid fa-arrow-up-right-from-square text-sky-400"></i>
                 <span>Twibbonize</span>
               </a>
@@ -430,7 +430,7 @@
     window.APP_CONFIG = {
       networkUrl: {{ network_url | tojson }},
       captionTemplate: {{ config.caption_template | tojson }},
-      twibbonizeUrl: {{ (config.twibbonize_url or 'https://www.twibbonize.com') | tojson }},
+      twibbonizeUrl: {{ (config.twibbonize_url or 'https://twb.nz/adhigana26') | tojson }},
       circleCenterX: {{ config.circle_center_x }},
       circleCenterY: {{ config.circle_center_y }},
       circleRadius: {{ config.circle_radius }},

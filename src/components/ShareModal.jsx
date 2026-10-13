@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import QRCode from 'qrcode';
-import { X, Copy, Check, Smartphone, Share2 } from 'lucide-react';
+import { X, Copy, Check, Smartphone, Share2, ExternalLink } from 'lucide-react';
 
-export default function ShareModal({ isOpen, onClose, onCopyLink }) {
+export default function ShareModal({ isOpen, onClose, onCopyLink, config }) {
   const [qrDataUrl, setQrDataUrl] = useState('');
   const [copied, setCopied] = useState(false);
   const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
@@ -103,6 +103,21 @@ export default function ShareModal({ isOpen, onClose, onCopyLink }) {
             <span>{copied ? 'Tersalin' : 'Salin'}</span>
           </button>
         </div>
+
+        {config?.twibbonize_url && (
+          <div className="mt-3.5 pt-3 border-t border-gray-800 text-center">
+            <p className="text-[10px] text-gray-400 mb-1">Link Alternatif Twibbonize:</p>
+            <a
+              href={config.twibbonize_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-sky-400 hover:text-sky-300 font-medium inline-flex items-center gap-1 hover:underline transition"
+            >
+              <span>twb.nz/adhigana26</span>
+              <ExternalLink className="w-3 h-3" />
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );
